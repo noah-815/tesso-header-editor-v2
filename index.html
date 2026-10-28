@@ -1,0 +1,1785 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Header Color Editor v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  /* ── Editor chrome ─────────────────────────────── */
+  :root {
+    --ui-bg: #f3f3f4;
+    --ui-panel: #ffffff;
+    --ui-line: #e4e4e7;
+    --ui-text: #18181b;
+    --ui-sub: #71717a;
+    --ui-accent: #2563eb;
+    --ui-accent-soft: #eff4ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: Pretendard, -apple-system, sans-serif;
+    background: var(--ui-bg);
+    color: var(--ui-text);
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .editor {
+    background: var(--ui-panel);
+    border-right: 1px solid #e3e3e3;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  /* top bar — Figma "top" (17465:33199) */
+  .topbar {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; height: 57px; padding: 6px 12px 6px 24px;
+    background: #fff; border-bottom: 1px solid rgba(51,62,76,.1);
+  }
+  .topbar h1 { margin: 0; font: 700 16px/24px Pretendard, sans-serif; color: #000; white-space: nowrap; }
+  .topbar .divider { width: 1px; height: 20px; background: rgba(51,62,76,.16); margin: 0 4px 0 24px; }
+  .text-btn {
+    display: flex; align-items: center; gap: 4px; height: 40px; padding: 8px 12px 8px 8px; border-radius: 8px;
+    border: 0; background: transparent; cursor: pointer; color: #000;
+    font: 600 14px/20px Pretendard, sans-serif;
+  }
+  .text-btn { white-space: nowrap; flex: none; }
+  .text-btn:hover { background: rgba(24,29,37,.06); }
+  .text-btn:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  /* prototype-only: switch between the two overlap placements */
+  .version-switch {
+    display: flex; gap: 2px; margin-left: 16px; padding: 3px; border-radius: 999px;
+    background: #f0f4ff; border: 1px dashed #a9bcff;
+  }
+  .version-switch button {
+    border: 0; background: transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer;
+    font: 500 12px/1.2 Pretendard, sans-serif; color: #4a5a8a; white-space: nowrap;
+  }
+  .version-switch button[aria-pressed="true"] { background: #1b4efe; color: #fff; }
+  .version-switch button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  body[data-mode="color"] [data-only]:not([data-only~="color"]),
+  body[data-mode="display"] [data-only]:not([data-only~="display"]),
+  body[data-mode="stage"] [data-only]:not([data-only~="stage"]) { display: none !important; }
+  /* colour-menu controls in the preview toolbar only show while the 컬러 depth is open */
+  body:not([data-depth="depthColor"]) [data-in-color] { display: none !important; }
+  .topbar .actions { margin-left: auto; display: flex; gap: 12px; padding-right: 2px; }
+  .btn {
+    width: 90px; height: 40px; border-radius: 4px; cursor: pointer;
+    font: 500 14px/1 Inter, Pretendard, sans-serif;
+  }
+  .btn.secondary { background: #fff; color: #000; border: 1px solid #d8d8d8; }
+  .btn.primary { background: #000; color: #fff; border: 1px solid #000; }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* header design dialog */
+  .design-dialog {
+    width: min(640px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.2); color: var(--ui-text);
+  }
+  .design-dialog::backdrop { background: rgba(15,14,13,.45); }
+  .dlg-head { padding: 20px 24px 4px; }
+  .dlg-head h2 { margin: 0; font: 700 16px/24px Pretendard, sans-serif; }
+  .dlg-head p { margin: 2px 0 0; font-size: 12.5px; color: var(--ui-sub); }
+  .dlg-body { padding: 16px 24px 20px; }
+  .dlg-body .sets { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dlg-body .set { padding: 10px; border-radius: 10px; }
+  .dlg-body .set-thumb { height: 72px; border-radius: 6px; padding: 0 10px; gap: 5px; align-items: flex-start; padding-top: 12px; }
+  .dlg-body .set-thumb.inset { padding: 8px; }
+  .dlg-body .set-thumb.inset > div { height: 22px; flex: 1; }
+  .dlg-body .set-thumb i { width: 14px; height: 4px; }
+  .dlg-body .set-thumb b { width: 24px; height: 5px; top: 12px; }
+  .dlg-body .set-thumb.inset b { top: 8px; }
+  .dlg-body .set span { font-size: 12.5px; margin-top: 8px; color: var(--ui-text); font-weight: 600; }
+  .dlg-body .set small { display: block; font-size: 11.5px; color: var(--ui-sub); margin-top: 2px; line-height: 1.4; white-space: normal; }
+  .dlg-body .set[aria-pressed="true"] span { color: var(--ui-accent); }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 24px 20px; }
+
+
+  .group { padding: 18px 20px; border-bottom: 1px solid var(--ui-line); }
+  .group-title {
+    font-size: 12px; font-weight: 600; margin: 0 0 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hint { font-size: 11.5px; color: var(--ui-sub); line-height: 1.5; margin: 8px 0 0; }
+  .hint.warn { color: #b45309; }
+  .hint code { font-family: Inter, sans-serif; font-size: 10.5px; background: #f4f4f5; padding: 0 4px; border-radius: 3px; }
+  .sub { margin-top: 14px; }
+  .sub-label { font-size: 11.5px; color: var(--ui-sub); margin: 0 0 6px; }
+  :root {
+    --logo: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIcAAAAeCAYAAAAGjg2BAAAACXBIWXMAABYlAAAWJQFJUiTwAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABeNJREFUeAHNW9t12zgQHe3J/7qDQBWsUkHgCqJUsHQFsSuwXMEqFZipIHEF4lZgpwKxgygVIBgRdCToDokXFd1zYCd4zBDAYF6AycTjhy3Ptny1paJA2L4bE49XPrZcUQFYOusBfktKgDC3aFp2jBK+S0X0lXC0b4gm+qBcbE2AkJg04fD53FMmHB0JG0qAMDfejCiBNtMKB8KjGRCSvygfyhZmkr1xAXxWppP8JC1ix2lHR8LCFNJQFkznkS4blS1bae9KCEcP3rhbmh6srv+jNPw70s4bWlE5LM+0JrngvXv2D8aMdQvo/GBLKxDStrwnfAJ3tsxns9nOb3AqW3vV32x5AnSUKxIfxrXl01AE7DdsaVhzMBpL95ri6KK59eC1eGdptjROR9lfW9A098cP9P3seB7iLXWCv6Dh+R/PXbBFmkYm4SQteKzBdnlFI+A+Ap8o/4C/y4Qj1lfYjNAL+lZTxudQATzqgW991XRJZsVJ8UehWVNBWF4r++sL4hO5icik1LY0oL6istDmQswL750tlf0na4gd6HLfr2uyz+EE5AU0lXLoDlEL9ZrCgUJLFrr/Qf0HKo97ExI+ngnOJKMDzvu3F+Rch3QXWJcFNxFEN0gQTRdq+31bR7cGQ/QEG8n8v9IFwc0faeVP/CNXOBSoe6FpsAvkj4A0QcM/nAZsQHtFeeBF97+ZQ+XUSGsqrEHdlf1OnSwcdjBLl/Kq+TR+o2mgQF1LI3AaQDIpPVDENBb2jqGlLurzcWtGHP5zwu4XH2Z0oBfRwsHOihMMJHF3NAGMnIFtaRwajfPC4Br0UbmbaHnwGjWg6dGUS7aVwHdQ988boTM7T+jk8IQ0ndpvVp8fY/MOIXAnH2XwdoH80Dyaw/9wXsby4Trt9VsS3twY3NjyTMdrpqib0ySHKQGsOfx1WkjCoSmcKKvnGiW+cuCEgj+YPWd0ykbNl6OhQRNywp5A355/Mtinsd/BAuI7o2xenqY4UAmAzn6uQ8oZN17AT4ne/b2UiaEu+7ciLBgtYXvuQ6OxwobUoO6qhH/g/LDPoOnSzMsRStytsICsbNnYiS7oPLgLSUeTC8k8NKij03yoDTmzKVjRqY+k6IIv5yTh4OTIHJR31GXWkFpWNL2AtNTdqYSaFPQtXwaGwailxOl2wncDmi7hcg5qZ8nn2I2czMZ09yJ8Z6A8Jmxb51QeNXUaI9S3kRZcmYhHSvT7wqqhTLA5s7zZvPgajc3rVCmAEChQ9/MNJeLA0fIvlfYhYKCjJd3KcqLIl2YV6fRKKfAUNc6RRUNlsKLu29RBXf/244b+DN6Dupdk4WC4k8ARi6++Q0PA75ZG7VcK4asOFToz/qgnFvtHQCUiMhc2s9l+9po04ZB9UgyY36aEQ4oSKH9THtYk3BhSGHKzmz6KPgJyWUmU46jo/EBruo/oSgjHW1CnKAPuhKLQTwf6CxrUMc02sCDBLHpTO5A9PRtc8FCBpqbvgKApjLj04GQN+m5Av9UAbc4xbMGY7VD0YORHPZoCwdGDQONK6L+JmdvBOF6/H2YcShgb1FfgvTDyY+s9jZyLtz4yQci+mXXaAyW6FA1nLZFJaSMzkbVQX1FBuIgwJJlXDKY7dGxK2OdRoMtDH6lKDulyRALZu2WnU8peFgnL2Fk13R2P9po4I7sWHESUtGoojq9018KmZU0FwebF8vpA5V7QsdZD68Lmf0HY+ezx4l7edTDlAU+1SVe9kplYgb5Loa+mSBjZtCgqNLeD8WPmRQljSuLk9XnJP01gPDhHqxicOWhAE7rPKWFSetRCfUWF4dT4n8pxMNj5v/Y1cSnhYKJ3RyqpLJBdZil/DcOc1GeblB4Ddy2lw+Sen3Q5NyUa6oTiFpnoHOFoqfMtOF6fl9YYhxjQHpX5bTKWwvChu5QxwL+pMdO95FpR2AOmVLTUrSMfNhaKwb/9mZmEq/bAG9EjuJN98kgoNOsojH+lIbWnfKvHV0k8R74teG4evxNa0hxi9i5lHX4Bgpi/3lEQ4j0AAAAASUVORK5CYII=);
+  }
+  /* 미디어 위 컬러: one row per tone — 배경 · 전경 colour, 밝은/어두운 로고 */
+  .logo-row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 12px; }
+  .text-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .text-link:hover { color: var(--ui-text); }
+  .tones { display: grid; grid-template-columns: 1fr 28px 28px auto; align-items: center; gap: 8px 10px; margin-top: 12px; }
+  .tones.is-hidden { display: none; }
+  /* the per-tone logo column is C안 only; A안 picks 로고 컬러 once below */
+  body:not([data-mode="stage"]) .tones { grid-template-columns: 1fr 28px 28px; }
+  .tones-head { display: contents; font-size: 11px; color: var(--ui-sub); }
+  .tones-head span { text-align: center; }
+  .tone-name { font-size: 12px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .swatch.has-blur::after { content: ""; position: absolute; right: 2px; top: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--ui-accent); box-shadow: 0 0 0 1.5px #fff; }
+  /* 밝은 로고 / 어두운 로고: compact segmented control */
+  .seg.logo-seg { padding: 2px; flex: none; }
+  .seg.logo-seg button { flex: none; padding: 5px 8px; font-size: 11.5px; white-space: nowrap; }
+  .is-hidden { display: none !important; }
+
+  /* header set thumbnails */
+  .sets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .set {
+    border: 1px solid var(--ui-line); border-radius: 8px; background: #fff;
+    padding: 6px; cursor: pointer; text-align: left; font: inherit;
+  }
+  .set:disabled { cursor: not-allowed; opacity: .45; }
+  .set[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent); }
+  .set-thumb {
+    height: 26px; border-radius: 4px; background: #f4f4f5;
+    display: flex; align-items: center; padding: 0 5px; gap: 3px; position: relative;
+  }
+  .set-thumb i { display: block; height: 3px; width: 8px; background: #a1a1aa; border-radius: 1px; }
+  .set-thumb b { position: absolute; left: 50%; transform: translateX(-50%); width: 14px; height: 4px; background: #3f3f46; border-radius: 1px; }
+  .set-thumb .r { margin-left: auto; }
+  .set-thumb.inset { background: #d4d4d8; padding: 4px; }
+  .set-thumb.inset > div { flex: 1; height: 100%; background: #fff; border-radius: 2px; display: flex; align-items: center; padding: 0 4px; gap: 3px; position: relative; }
+  .set span { display: block; font-size: 11px; margin-top: 5px; color: var(--ui-sub); white-space: nowrap; }
+  .set[aria-pressed="true"] span { color: var(--ui-accent); font-weight: 600; }
+
+  /* switch */
+  .switch { position: relative; width: 34px; height: 20px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .switch span {
+    position: absolute; inset: 0; border-radius: 999px; background: #d4d4d8; transition: background .15s;
+    pointer-events: none;
+  }
+  .switch span::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s;
+  }
+  .switch input:checked + span { background: var(--ui-accent); }
+  .switch input:checked + span::after { transform: translateX(14px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+  /* segmented */
+  .seg { display: flex; background: #f4f4f5; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg button {
+    flex: 1; border: 0; background: transparent; border-radius: 6px; padding: 7px 4px;
+    font: inherit; font-size: 12px; color: var(--ui-sub); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .seg button:disabled { cursor: not-allowed; }
+  .is-dimmed-ui { opacity: .4; }
+  .is-dimmed-ui label, .is-dimmed-ui .switch input { cursor: not-allowed; }
+  /* 겹쳤을 때 컬러: long labels size to their text and stay on one line */
+  #onSeg button { flex: 1 1 auto; white-space: nowrap; padding: 7px 6px; gap: 4px; }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--ui-text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .chip { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.12); flex: none; position: relative; overflow: hidden; background: var(--b); }
+  .chip::after { content: "A"; position: absolute; inset: 0; font: 600 9px/14px Inter, sans-serif; text-align: center; color: var(--c); }
+
+  /* custom colour fields */
+  .custom { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .cfield { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+  .cfield .swatch { flex: none; }
+  .cfield label { font-size: 12px; line-height: 1.3; display: flex; align-items: center; gap: 6px; }
+  .cfield .tag { white-space: nowrap; font: 500 10.5px/1 Inter, sans-serif; color: var(--ui-sub); background: #f4f4f5; border-radius: 4px; padding: 3px 5px; }
+  #customFields { display: flex; flex-direction: column; gap: 4px; }
+  .cgroup { margin: 2px 0 2px; font-size: 11.5px; font-weight: 600; color: var(--ui-sub); display: flex; align-items: center; gap: 6px; }
+  /* inset divider between the 헤더·메뉴 and 검색 groups */
+  .cdivider { height: 1px; background: var(--ui-line); margin: 10px 0 8px; border: 0; }
+  .checker {
+    background-image: linear-gradient(45deg, #e4e4e7 25%, transparent 25%, transparent 75%, #e4e4e7 75%), linear-gradient(45deg, #e4e4e7 25%, transparent 25%, transparent 75%, #e4e4e7 75%);
+    background-size: 8px 8px; background-position: 0 0, 4px 4px; background-color: #fff;
+  }
+  .swatch {
+    position: relative; width: 28px; height: 28px; border-radius: 6px; overflow: hidden; padding: 0; cursor: pointer;
+    border: 1px solid var(--ui-line);
+  }
+  .swatch i { position: absolute; inset: 0; background: var(--v); pointer-events: none; }
+  .swatch[aria-expanded="true"] { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ui-accent); }
+  .swatch:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+  /* colour picker — Figma menu/color/custom (6870:297859) */
+  .cpick {
+    position: fixed; z-index: 50; width: 238px; padding: 1px; background: #fff;
+    border: 1px solid rgba(51,62,76,.1); border-radius: 12px; box-shadow: 0 4px 10px rgba(65,78,97,.08), 0 12px 32px rgba(65,78,97,.12);
+    font-family: Pretendard, sans-serif;
+  }
+  .cpick[hidden] { display: none; }
+  .cp-sv { position: relative; height: 172px; margin: 16px; border-radius: 4px; cursor: crosshair; touch-action: none;
+    background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), hsl(var(--h) 100% 50%); }
+  .cp-handle {
+    position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid #fff;
+    box-shadow: 0 1px 1px rgba(65,78,97,.08), 0 2px 8px rgba(65,78,97,.16); pointer-events: none; background: var(--c);
+  }
+  .cp-track { position: relative; height: 8px; margin: 0 16px; border-radius: 9999px; cursor: pointer; touch-action: none; }
+  .cp-track .cp-handle { top: 4px; }
+  .cp-hue { margin-top: 4px; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+  .cp-alpha { margin-top: 20px; }
+  .cp-alpha::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(to right, transparent, var(--solid)); }
+  .cp-input { display: flex; align-items: center; gap: 8px; padding: 20px 16px 16px; }
+  .cp-input > span { font: 500 12px/18px Pretendard, sans-serif; color: #333e4c; }
+  .cp-field { flex: 1; display: flex; align-items: center; min-width: 0; background: #f6f7f9; border-radius: 6px; }
+  .cp-field label { display: flex; align-items: center; gap: 2px; padding: 8px; font: 400 12px/18px Pretendard, sans-serif; color: #99a0aa; }
+  .cp-field label:first-child { flex: 1; min-width: 0; }
+  .cp-field label + label { border-left: 1px solid rgba(51,62,76,.1); padding-left: 10px; }
+  .cp-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; padding: 0; font: inherit; color: #333e4c; text-transform: uppercase; }
+  .cp-field input.pct { width: 26px; text-align: right; }
+  .cp-field input[aria-invalid="true"] { color: #dc2626; }
+  .cp-blur { padding: 0 16px 16px; border-top: 1px solid rgba(51,62,76,.08); margin-top: -2px; padding-top: 14px; }
+  .cp-blur[hidden] { display: none; }
+  .cp-blur-head { display: flex; align-items: center; justify-content: space-between; font: 500 12px/18px Pretendard, sans-serif; color: #333e4c; }
+  .cp-blur-head label { white-space: nowrap; cursor: pointer; }
+  .cp-blur-row { margin-top: 10px; display: flex; align-items: center; gap: 10px; font: 500 12px/18px Pretendard, sans-serif; color: #333e4c; }
+  .cp-blur-row[hidden] { display: none; }
+  .cp-blur-row input[type="range"] { flex: 1; min-width: 0; accent-color: #1b4efe; }
+  .cp-blur-row output { flex: none; width: 34px; text-align: right; font: 400 12px/18px Inter, sans-serif; color: #333e4c; }
+  .cp-blur p { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: #99a0aa; }
+  .custom-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--ui-sub); }
+  .link-btn {
+    border: 1px solid var(--ui-line); background: #fff; border-radius: 6px; padding: 4px 8px;
+    font: inherit; font-size: 11.5px; color: var(--ui-text); cursor: pointer;
+  }
+  .link-btn:hover { background: #f4f4f5; }
+
+  .scheme-row { display: flex; align-items: center; gap: 8px; }
+  .group-desc { margin: 4px 0 12px; }
+  .on-sub { margin: 18px 0 0; color: var(--ui-text); font-weight: 600; }
+  .scheme-row select { flex: 1; }
+  .scheme-row .chip { width: 30px; height: 30px; border-radius: 8px; }
+  .scheme-row .chip::after { font-size: 13px; line-height: 30px; }
+  select.ui {
+    font: inherit; font-size: 12.5px; padding: 7px 30px 7px 10px; border-radius: 8px;
+    border: 1px solid var(--ui-line); background: #fff; color: var(--ui-text);
+  }
+
+
+  /* ── Stage ─────────────────────────────────────── */
+  .stage { position: relative; background: #eff1f4; padding: 32px; min-width: 0; min-height: 0; overflow: hidden; }
+  .stage-inner { display: flex; flex-direction: column; gap: 20px; margin: 0 auto; }
+  .stage-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  /* preview toolbar selects — Figma 180 × 42 dropdowns */
+  .tool-select {
+    position: relative; display: flex; align-items: center; min-width: 180px; height: 42px;
+    background: #fff; border: 1px solid #dee1e6; border-radius: 6px; color: #0a0a0a;
+  }
+  .tool-select > svg { position: absolute; left: 10px; width: 16px; height: 16px; pointer-events: none; }
+  .tool-select .caret { left: auto; right: 15px; width: 14px; height: 14px; }
+  .tool-select select {
+    appearance: none; -webkit-appearance: none; width: 100%; height: 100%; border: 0; background: transparent;
+    padding: 0 36px 0 36px; font: 400 14px/1.5 Pretendard, sans-serif; color: inherit; cursor: pointer; border-radius: 6px;
+  }
+  .tool-select select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+  .tool-btn { cursor: pointer; font: 400 14px/1.5 Pretendard, sans-serif; padding: 0 36px; text-align: left; }
+  .tool-btn:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  .display-wrap { position: relative; }
+  /* 헤더 겹치기 status on the 헤더 표시 button */
+  .ov-badge {
+    display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 2px 8px 2px 7px; border-radius: 999px;
+    font: 600 11.5px/18px Pretendard, sans-serif; vertical-align: 1px; background: #f4f4f5; color: var(--ui-sub);
+  }
+  .ov-badge i { width: 6px; height: 6px; border-radius: 50%; background: #a1a1aa; }
+  .ov-badge.is-on { background: #e9f6e9; color: #2a7d2b; }
+  .ov-badge.is-on i { background: #3eaf3f; }
+  .tool-btn:disabled { cursor: not-allowed; opacity: .5; }
+  /* 헤더 표시 popover — Figma 6870:297330 */
+  .pop {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 381px; padding: 20px;
+    background: #fff; border-radius: 6px; box-shadow: 0 0 20px rgba(0,0,0,.35);
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .pop[hidden] { display: none; }
+  .pop-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .pop-title { margin: 0; font: 500 16px/1.5 Pretendard, sans-serif; color: #000; }
+  .pop-desc { margin: 7px 0 0; font: 400 12px/1.5 Pretendard, sans-serif; color: #797979; }
+  .pop-box { border: 1px solid #e3e3e3; border-radius: 6px; padding: 18px 15px 6px; }
+  .pop-box .pop-desc { margin: 0 0 8px; }
+  .pop-box .pop-desc#insetHint { margin: 4px 0 10px; }
+  .pick-row { display: flex; align-items: center; justify-content: space-between; height: 38px; font: 400 14px/1.5 Pretendard, sans-serif; color: #000; }
+  .pick {
+    display: flex; align-items: center; gap: 7px; border: 0; background: none; padding: 4px 0 4px 8px; cursor: pointer;
+    font: 400 14px/1.5 Pretendard, sans-serif; color: #000; border-radius: 4px;
+  }
+  .pick b { font-weight: 400; }
+  .pick .caret { width: 16px; height: 16px; }
+  .pick:hover { background: #f6f7f9; }
+  .pick:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  /* option list — Figma 6870:297344 */
+  .pick-menu {
+    position: absolute; z-index: 31; width: 284px; margin: 0; padding: 12px 0 4px; list-style: none;
+    background: #fff; border-radius: 6px; box-shadow: 0 0 20px rgba(0,0,0,.35);
+  }
+  .pick-menu[hidden] { display: none; }
+  .pick-menu li {
+    display: flex; align-items: center; justify-content: space-between; height: 50px; padding: 0 20px 0 26px; margin-bottom: 1px;
+    font: 500 12px/1.5 Pretendard, sans-serif; color: #000; cursor: pointer;
+  }
+  .pick-menu li:hover { background: #f6f7f9; }
+  .pick-menu li[aria-selected="true"] { background: #f0f4ff; }
+  .pick-menu .check { width: 18px; height: 18px; color: #1b4efe; visibility: hidden; }
+  .pick-menu li[aria-selected="true"] .check { visibility: visible; }
+  /* green switch used in the popover (toggle_on #3eaf3f) */
+  .switch.green input:checked + span { background: #3eaf3f; }
+
+  /* editor depth 1: menu list — Figma 17548:102762 */
+  .menu-list { list-style: none; margin: 0; padding: 30px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .menu-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; height: 52px; padding: 0 16px 0 10px;
+    background: #fff; border: 1px solid #e3e3e3; border-radius: 6px; cursor: pointer;
+    font: 400 14px/1.5 Pretendard, sans-serif; color: #000; text-align: left;
+  }
+  .menu-item:hover { background: #fafafa; }
+  .menu-item:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  .menu-item .ico { width: 32px; height: 32px; border-radius: 6px; background: #f6f7f9; display: flex; align-items: center; justify-content: center; color: #323232; flex: none; }
+  .menu-item .ico svg { width: 16px; height: 16px; }
+  .menu-item span { flex: 1; }
+  .menu-item > svg { width: 16px; height: 16px; color: #0a0a0a; flex: none; }
+  /* editor depth 2 */
+  .depth-head { display: flex; align-items: center; gap: 4px; height: 56px; padding: 0 16px 0 12px; border-bottom: 1px solid var(--ui-line); }
+  .depth-head h2 { margin: 0; font: 700 15px/1.5 Pretendard, sans-serif; }
+  .back-btn {
+    width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: #0a0a0a;
+  }
+  .back-btn:hover { background: #f4f4f5; }
+  .back-btn svg { width: 18px; height: 18px; }
+  .empty-depth { padding: 40px 24px; text-align: center; font-size: 13px; color: var(--ui-sub); line-height: 1.6; }
+  .tools-right { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+  /* C안: overlap controls in the preview toolbar */
+  .overlap-inline {
+    display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 6px 0 14px;
+    background: #fff; border: 1px solid #dee1e6; border-radius: 6px;
+  }
+  .ov-toggle { display: flex; align-items: center; gap: 8px; font: 500 13px/1 Pretendard, sans-serif; white-space: nowrap; cursor: pointer; }
+  .overlap-inline .seg { padding: 2px; }
+  .overlap-inline .seg button { padding: 5px 8px; white-space: nowrap; }
+  .overlap-inline.is-dimmed-ui, .overlap-inline .is-dimmed-ui { cursor: not-allowed; }
+  #depthColor:not(.is-hidden) { display: flex; flex-direction: column; flex: 1 0 auto; }
+  .auto-show {
+    position: sticky; bottom: 0; margin-top: auto; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 20px; background: var(--ui-panel); border-top: 1px solid var(--ui-line);
+  }
+  .auto-show label { font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+  /* one-time tooltip announcing the toggle */
+  .coach {
+    position: absolute; bottom: calc(100% + 10px); right: 12px; z-index: 20; width: 260px;
+    background: #18181b; color: #fff; border-radius: 10px; padding: 12px 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.24);
+    display: flex; flex-direction: column; gap: 10px;
+    animation: coach-in .2s ease-out;
+  }
+  .coach[hidden] { display: none; }
+  .coach::before {
+    content: ""; position: absolute; bottom: -5px; right: 18px; width: 10px; height: 10px;
+    background: inherit; transform: rotate(45deg); border-radius: 2px;
+  }
+  .coach p { margin: 0; font-size: 12px; line-height: 1.5; }
+  .coach-close {
+    align-self: flex-end; border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer;
+    background: #fff; color: #18181b; font: 600 11.5px/1 Pretendard, sans-serif;
+  }
+  @keyframes coach-in { from { opacity: 0; transform: translateY(4px); } }
+  @media (prefers-reduced-motion: reduce) { .coach { animation: none; } }
+  .previews { display: flex; gap: 24px; align-items: flex-start; }
+  .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .pane.desktop, .pane.mobile { flex: none; }
+  .pane-label {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    font-size: 12px; margin-bottom: 8px; min-height: 22px;
+  }
+  .status {
+    font-family: Inter, sans-serif; font-size: 11px; padding: 3px 8px; border-radius: 999px;
+    background: #fff; border: 1px solid var(--ui-line); color: var(--ui-sub);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .status b { color: var(--ui-text); font-weight: 600; }
+  .frame {
+    position: relative; flex: 1; min-height: 0; border-radius: 6px; overflow: hidden;
+    background: #fff; box-shadow: 0 0 10px rgba(0,0,0,.15);
+  }
+  .pane .frame { flex: none; }
+  .m .scroller, .m-menu { scrollbar-width: none; }
+  .viewport { position: absolute; left: 0; top: 0; width: var(--vw); transform-origin: 0 0; }
+  .scroller { position: absolute; inset: 0; overflow-y: auto; container-type: size; }
+
+  /* ── Storefront tokens ─────────────────────────── */
+  /* colour tokens (--solid-*, --menu-*, --search-*, --header-backdrop) are set inline from SCHEMES / custom */
+  .frame {
+    --header-height: 64px;   /* bar */
+    --header-area: 64px;     /* space the header occupies in the page */
+    --header-inset: 0px;
+    --header-pad-x: 19px;
+    --header-gap: 12px;
+  }
+  /* set08: inset header — floating container, always header-solid */
+  .frame[data-set="08"] {
+    --header-area: 102px;
+    --header-inset: 19px;
+    --header-pad-x: 32px;
+    --header-gap: 16px;
+  }
+  /* mobileA header is the same for every set */
+  .frame.m[data-set] { --header-height: 52px; --header-area: 52px; --header-inset: 0px; --header-pad-x: 16px; }
+  /* overlap foregrounds — Figma "Header On Media (테스트용)", on-dark / on-light only (independent of scheme) */
+  .frame[data-on="dark"]  { --overlap-nav: #ffffff; --overlap-utility: #ffffff; }
+  .frame[data-on="light"] { --overlap-nav: #1a1a1a; --overlap-utility: #1a1a1a; }
+  .hdr.is-transparent .hdr-logo { background: var(--overlap-logo, currentColor); }
+  .hdr:not(.is-transparent) .hdr-logo { background: var(--solid-logo, currentColor); } /* 밝은 / 어두운 로고 when not overlapped */ /* A안: logo follows the nav colour */
+
+  /* set05_header / set08_header */
+  .hdr {
+    position: sticky; top: 0; z-index: 3;
+    padding: var(--header-inset);
+    --header-bg: var(--solid-bg);
+    --header-nav: var(--solid-nav);
+    --header-utility: var(--solid-utility);
+    --header-nav-hover: var(--solid-nav-hover);
+  }
+  .hdr.is-transparent {
+    --header-bg: var(--overlap-bg, rgba(255,255,255,0)); /* custom on-media may tint the bar */
+    --header-nav: var(--overlap-nav);
+    --header-utility: var(--overlap-utility);
+    --header-nav-hover: var(--overlap-nav); /* no on-media hover token: underline only */
+  }
+  .hdr-inner { position: relative; }
+  .hdr:not(.is-transparent) .hdr-bar, .hdr-menu, .hdr-search, .m-menu {
+    -webkit-backdrop-filter: blur(var(--header-blur, 0px)); backdrop-filter: blur(var(--header-blur, 0px));
+  }
+  .hdr.is-transparent .hdr-bar {
+    -webkit-backdrop-filter: blur(var(--overlap-blur, 0px)); backdrop-filter: blur(var(--overlap-blur, 0px));
+  }
+  .hdr-bar {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    height: var(--header-height);
+    padding: 16px var(--header-pad-x);
+    background: var(--header-bg);
+    color: var(--header-nav);
+    font-family: Inter, sans-serif; font-size: 13px; line-height: 1.2;
+    transition: background-color .25s ease, color .25s ease;
+  }
+  .hdr-nav, .hdr-util { display: flex; align-items: center; gap: var(--header-gap); height: 100%; }
+  .hdr-item {
+    display: flex; align-items: center; height: 100%; padding: 8px;
+    color: inherit; text-decoration: none; white-space: nowrap; cursor: pointer;
+  }
+  .hdr-nav .hdr-item:first-child { padding-left: 0; }
+  .hdr-util .hdr-item:last-child { padding-right: 0; }
+  .hdr-util { color: var(--header-utility); transition: color .25s ease; }
+  .hdr-item:hover, .hdr-item.is-open { color: var(--header-nav-hover); }
+  .hdr-item:hover span, .hdr-item.is-open span { text-decoration: underline; text-underline-offset: 2px; }
+  /* logo inlined as data URI: file:// pages block CSS masks loaded from disk */
+  .hdr-logo {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 67.5px; height: 15px;
+    background: currentColor;
+    -webkit-mask: var(--logo) center / contain no-repeat;
+            mask: var(--logo) center / contain no-repeat;
+  }
+
+  /* set05_expanded (2depth) */
+  .hdr-menu {
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: var(--menu-bg); color: var(--menu-nav);
+    padding: 12px var(--header-pad-x) 32px;
+    font-family: Inter, sans-serif; font-size: 13px; line-height: 1.2;
+    display: flex; flex-direction: column; align-items: flex-start;
+    clip-path: inset(0 0 100% 0);
+    visibility: hidden;
+    transition: clip-path .28s cubic-bezier(.2,.7,.2,1), visibility 0s linear .28s, background-color .25s ease, color .25s ease;
+  }
+  .frame[data-set="08"] .hdr-menu { padding-top: 4px; padding-bottom: 28px; min-height: 120px; }
+  .hdr-menu a { padding: 8px 0; color: inherit; text-decoration: none; text-transform: capitalize; }
+  .hdr-menu a:hover, .hdr-menu a.is-hover { color: var(--menu-nav-hover); text-decoration: underline; text-underline-offset: 2px; }
+  .hdr.is-open .hdr-menu {
+    clip-path: inset(0 0 0 0); visibility: visible;
+    transition: clip-path .28s cubic-bezier(.2,.7,.2,1), visibility 0s, background-color .25s ease, color .25s ease;
+  }
+
+  /* set05_searchBar + set05_searchResult (opens on Search click) */
+  .hdr-search {
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: var(--search-bg); color: var(--search-result);
+    clip-path: inset(0 0 100% 0);
+    visibility: hidden;
+    transition: clip-path .28s cubic-bezier(.2,.7,.2,1), visibility 0s linear .28s, background-color .25s ease, color .25s ease;
+  }
+  .hdr.is-search .hdr-search {
+    clip-path: inset(0 0 0 0); visibility: visible;
+    transition: clip-path .28s cubic-bezier(.2,.7,.2,1), visibility 0s, background-color .25s ease, color .25s ease;
+  }
+  .search-bar { padding: 36px var(--header-pad-x); }
+  .search-field {
+    display: flex; align-items: center; gap: 8px;
+    padding: 13px 0 14px; border-bottom: 1px solid var(--search-line);
+    transition: border-color .2s ease;
+  }
+  /* border-inactive when empty, border-active while typing */
+  .search-field:has(input:not(:placeholder-shown)) { border-bottom-color: var(--search-line-active); }
+  .search-icon { color: var(--search-icon); flex: none; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+  .search-icon svg { width: 20px; height: 20px; flex: none; }
+  .search-field input {
+    flex: 1; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent;
+    font: 400 13px/1.2 Pretendard, sans-serif; color: var(--search-input); caret-color: var(--search-input);
+  }
+  .search-field input::placeholder { color: var(--search-placeholder); }
+  .search-result {
+    padding: 6px var(--header-pad-x) 40px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .search-label { margin: 0; font: 500 13px/1.2 Pretendard, sans-serif; color: var(--search-label); }
+  .search-list { display: flex; flex-direction: column; align-items: flex-start; }
+  .search-list a {
+    padding: 8px 0; font: 400 13px/1.2 Inter, sans-serif; color: inherit;
+    text-decoration: none; text-transform: capitalize; cursor: pointer;
+  }
+  .search-list a:hover, .search-list a.is-hover { color: var(--search-result-hover); text-decoration: underline; text-underline-offset: 2px; }
+  .is-empty > .search-result { display: none; }
+  /* set08_searchBar: no icon, 16px input, 32px side padding */
+  .frame[data-set="08"]:not(.m) .search-bar { height: 124px; padding: 40px var(--header-pad-x) 32px; }
+  .frame[data-set="08"]:not(.m) .search-field { padding: 16px 0 17px; }
+  .frame[data-set="08"]:not(.m) .search-icon { display: none; }
+  .frame[data-set="08"]:not(.m) .search-field input { font-size: 16px; }
+  .frame[data-set="08"]:not(.m) .search-result { padding-top: 8px; }
+
+  /* set05_dim */
+  .dim {
+    position: absolute; inset: 0; z-index: 2; background: var(--header-backdrop);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
+  }
+  .frame.is-dimmed .dim { opacity: 1; }
+  .frame.is-searching .dim { pointer-events: auto; cursor: pointer; } /* click outside closes search */
+
+  /* ── mobileA (390 × 844) ───────────────────────── */
+  .m-screen { position: relative; height: 844px; overflow: hidden; }
+
+  .m .hdr-bar { padding: 10px var(--header-pad-x); }
+  .mh-btn {
+    display: flex; align-items: center; min-width: 48px; padding: 8px 8px 8px 0;
+    color: inherit; cursor: pointer; white-space: nowrap; border: 0; background: none; font: inherit;
+  }
+  .mh-btn.end { justify-content: flex-end; padding: 8px 0 8px 8px; color: var(--header-utility); }
+
+  /* mobileA_expanded: full-height panel under the header */
+  .m-menu {
+    position: absolute; left: 0; right: 0; top: 100%; height: calc(844px - var(--header-height));
+    background: var(--menu-bg); color: var(--menu-nav);
+    font-family: Inter, sans-serif; font-size: 13px; line-height: 1.2;
+    display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto;
+    opacity: 0; visibility: hidden;
+    transition: opacity .2s ease, visibility 0s linear .2s, background-color .25s ease, color .25s ease;
+  }
+  .hdr.is-menu .m-menu { opacity: 1; visibility: visible; transition: opacity .2s ease, visibility 0s, background-color .25s ease, color .25s ease; }
+  .m-menu .search-bar { padding: 12px 16px 16px; background: var(--search-bg); }
+  .m-menu .m-search { background: var(--search-bg); color: var(--search-result); }
+  .m-menu .search-field { gap: 6px; }
+  .m-menu .search-result { padding: 0 16px; }
+  .m-list { display: flex; flex-direction: column; padding: 0 16px; }
+  .m-item {
+    display: flex; align-items: center; gap: 16px; padding: 12px 0;
+    color: inherit; text-decoration: none; text-transform: capitalize; cursor: pointer;
+  }
+  .m-item span { flex: 1; }
+  .m-item svg { width: 16px; height: 16px; flex: none; }
+  /* touch: no hover colour on mobile */
+  .m .search-list a:hover { color: inherit; text-decoration: none; }
+  .m-list.depth2 .m-item { padding: 10px 0; }
+  .m-back {
+    display: flex; align-items: center; height: 40px; padding: 8px 0;
+    color: var(--menu-secondary); cursor: pointer; text-transform: capitalize;
+  }
+  .m-back svg { width: 16px; height: 16px; flex: none; }
+  .m-utility { padding: 48px 16px 16px; }
+  .m-utility a { display: block; padding: 10px 0; color: var(--menu-secondary); cursor: pointer; }
+  .m-menu[data-depth="1"] .depth2, .m-menu[data-depth="2"] .depth1 { display: none; }
+  .m-menu.is-typing .m-list, .m-menu.is-typing .m-back { display: none; }
+
+  /* overlap: page slides under the sticky header */
+  .page.is-under { margin-top: calc(var(--header-area) * -1); }
+
+  /* heroSection/fullBleed_center */
+  .hero {
+    position: relative; height: 100cqh; min-height: 560px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    padding: 96px 0;
+  }
+  .hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .hero-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.2); }
+  .hero[data-tone="light"] .hero-overlay { background: transparent; }
+  .hero-content { position: relative; width: min(1200px, 90%); text-align: center; color: #fff; display: flex; flex-direction: column; gap: 12px; }
+  .hero-content p { margin: 0; font-family: Pretendard, sans-serif; font-size: 14px; line-height: 20px; text-transform: capitalize; }
+  .hero-content h2 { margin: 0; font-family: Inter, sans-serif; font-weight: 600; font-size: 48px; line-height: 58px; letter-spacing: -0.2px; text-transform: capitalize; }
+  .hero-dots { display: none; }
+  .m .hero { min-height: 0; padding: 72px 20px; }
+  .m .hero-content { width: 100%; gap: 8px; }
+  .m .hero-content h2 { font-weight: 700; font-size: 40px; line-height: 50px; text-transform: none; }
+  .m .hero-dots { position: absolute; left: 64px; right: 64px; bottom: 24px; display: flex; gap: 8px; justify-content: center; }
+  .m .hero-dots i { flex: 1; max-width: 40px; height: 2px; background: rgba(255,255,255,.4); }
+  .m .hero-dots i:first-child { background: #fff; }
+
+  /* filler sections */
+  .section { padding: 64px 19px; font-family: Inter, sans-serif; color: #111; }
+  .section h3 { font-size: 13px; font-weight: 500; margin: 0 0 20px; }
+  .crumb { font-size: 12px; color: #6b6b6b; margin-bottom: 8px; }
+  .title { font-size: 28px; font-weight: 500; margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .card .ph { aspect-ratio: 3 / 4; background: #ddd; }
+  .card .t { font-size: 13px; margin-top: 10px; }
+  .card .p { font-size: 13px; color: #6b6b6b; margin-top: 4px; }
+  .band { background: #f2f1ee; padding: 96px 19px; text-align: center; font-family: Inter, sans-serif; font-size: 22px; color: #111; }
+  .m .section { padding: 40px 16px; }
+  .m .title { font-size: 22px; margin-bottom: 20px; }
+  .m .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .m .band { padding: 64px 16px; font-size: 18px; }
+</style>
+</head>
+<body data-mode="color" data-depth="depthRoot">
+
+<header class="topbar">
+  <h1>헤더 편집</h1>
+  <span class="divider" aria-hidden="true"></span>
+  <button type="button" class="text-btn" id="openDesigns" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M13.0563 13.5394C12.9787 13.2496 13.2936 12.9934 13.5828 13.1113L18.2476 15.0164C18.5288 15.1312 18.4904 15.5216 18.1898 15.6024L16.0365 16.1794C15.9595 16.2 15.8876 16.2363 15.8265 16.286C15.7653 16.3357 15.7158 16.3975 15.6825 16.4666L14.8971 18.0926C14.7639 18.3686 14.3438 18.3442 14.2664 18.056L13.0563 13.5394ZM17.5868 3.34001C18.0069 3.38278 18.3346 3.73787 18.3346 4.16927V14.2547L17.0016 13.7111V11.4748H3.00098V15.3363H12.7406L13.0978 16.6693H2.5013C2.04107 16.6693 1.66797 16.2962 1.66797 15.8359V4.16927C1.66797 3.70903 2.04106 3.33594 2.5013 3.33594H17.5013L17.5868 3.34001ZM3.00098 10.1418H17.0016V4.66895H3.00098V10.1418ZM6.37744 5.54867C6.74563 5.54867 7.04395 5.84698 7.04395 6.21517C7.04373 6.58317 6.7455 6.88167 6.37744 6.88167H4.52848C4.16043 6.88167 3.8622 6.58317 3.86198 6.21517C3.86198 5.84698 4.16029 5.54867 4.52848 5.54867H6.37744Z"/></svg>다른 헤더 디자인 보기</button>
+  <div class="version-switch" role="group" aria-label="비교 버전">
+    <button type="button" data-mode="color" aria-pressed="true">A · 겹치기 컬러 메뉴</button>
+    <button type="button" data-mode="display" aria-pressed="false">B · 헤더 표시</button>
+    <button type="button" data-mode="stage" aria-pressed="false">C · 겹치기 프리뷰 상단</button>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn secondary">종료</button>
+    <button type="button" class="btn primary">완료</button>
+  </div>
+</header>
+
+<dialog class="design-dialog" id="designDialog" aria-labelledby="designTitle">
+  <form method="dialog">
+    <div class="dlg-head">
+      <h2 id="designTitle">헤더 디자인 선택</h2>
+      <p>선택한 디자인은 적용을 눌러야 미리보기에 반영됩니다.</p>
+    </div>
+    <div class="dlg-body"><div class="sets" id="sets"></div></div>
+    <div class="dlg-foot">
+      <button type="submit" class="btn secondary" value="cancel">취소</button>
+      <button type="submit" class="btn primary" value="apply" id="applyDesign">적용</button>
+    </div>
+  </form>
+</dialog>
+
+<aside class="editor" aria-label="헤더 편집기">
+  <div class="depth" id="depthRoot">
+    <ul class="menu-list">
+      <li><button type="button" class="menu-item" data-depth="menu"><i class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 4.66667C8.36667 4.66667 8.66667 4.96667 8.66667 5.33333V8C8.66667 8.36667 8.36667 8.66667 8 8.66667C7.63333 8.66667 7.33333 8.36667 7.33333 8V5.33333C7.33333 4.96667 7.63333 4.66667 8 4.66667ZM7.99333 1.33333C4.31333 1.33333 1.33333 4.32 1.33333 8C1.33333 11.68 4.31333 14.6667 7.99333 14.6667C11.68 14.6667 14.6667 11.68 14.6667 8C14.6667 4.32 11.68 1.33333 7.99333 1.33333ZM8 13.3333C5.05333 13.3333 2.66667 10.9467 2.66667 8C2.66667 5.05333 5.05333 2.66667 8 2.66667C10.9467 2.66667 13.3333 5.05333 13.3333 8C13.3333 10.9467 10.9467 13.3333 8 13.3333ZM8.66667 11.3333H7.33333V10H8.66667V11.3333Z"/></svg></i><span>메뉴</span><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.19333 4.47333C5.93333 4.73333 5.93333 5.15333 6.19333 5.41333L8.78 8L6.19333 10.5867C5.93333 10.8467 5.93333 11.2667 6.19333 11.5267C6.45333 11.7867 6.87333 11.7867 7.13333 11.5267L10.1933 8.46667C10.4533 8.20667 10.4533 7.78667 10.1933 7.52667L7.13333 4.46667C6.88 4.21333 6.45333 4.21333 6.19333 4.47333Z"/></svg></button></li>
+      <li><button type="button" class="menu-item" data-depth="color"><i class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 4.66667C8.36667 4.66667 8.66667 4.96667 8.66667 5.33333V8C8.66667 8.36667 8.36667 8.66667 8 8.66667C7.63333 8.66667 7.33333 8.36667 7.33333 8V5.33333C7.33333 4.96667 7.63333 4.66667 8 4.66667ZM7.99333 1.33333C4.31333 1.33333 1.33333 4.32 1.33333 8C1.33333 11.68 4.31333 14.6667 7.99333 14.6667C11.68 14.6667 14.6667 11.68 14.6667 8C14.6667 4.32 11.68 1.33333 7.99333 1.33333ZM8 13.3333C5.05333 13.3333 2.66667 10.9467 2.66667 8C2.66667 5.05333 5.05333 2.66667 8 2.66667C10.9467 2.66667 13.3333 5.05333 13.3333 8C13.3333 10.9467 10.9467 13.3333 8 13.3333ZM8.66667 11.3333H7.33333V10H8.66667V11.3333Z"/></svg></i><span>컬러</span><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.19333 4.47333C5.93333 4.73333 5.93333 5.15333 6.19333 5.41333L8.78 8L6.19333 10.5867C5.93333 10.8467 5.93333 11.2667 6.19333 11.5267C6.45333 11.7867 6.87333 11.7867 7.13333 11.5267L10.1933 8.46667C10.4533 8.20667 10.4533 7.78667 10.1933 7.52667L7.13333 4.46667C6.88 4.21333 6.45333 4.21333 6.19333 4.47333Z"/></svg></button></li>
+      <li><button type="button" class="menu-item" data-depth="scroll"><i class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 4.66667C8.36667 4.66667 8.66667 4.96667 8.66667 5.33333V8C8.66667 8.36667 8.36667 8.66667 8 8.66667C7.63333 8.66667 7.33333 8.36667 7.33333 8V5.33333C7.33333 4.96667 7.63333 4.66667 8 4.66667ZM7.99333 1.33333C4.31333 1.33333 1.33333 4.32 1.33333 8C1.33333 11.68 4.31333 14.6667 7.99333 14.6667C11.68 14.6667 14.6667 11.68 14.6667 8C14.6667 4.32 11.68 1.33333 7.99333 1.33333ZM8 13.3333C5.05333 13.3333 2.66667 10.9467 2.66667 8C2.66667 5.05333 5.05333 2.66667 8 2.66667C10.9467 2.66667 13.3333 5.05333 13.3333 8C13.3333 10.9467 10.9467 13.3333 8 13.3333ZM8.66667 11.3333H7.33333V10H8.66667V11.3333Z"/></svg></i><span>스크롤</span><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.19333 4.47333C5.93333 4.73333 5.93333 5.15333 6.19333 5.41333L8.78 8L6.19333 10.5867C5.93333 10.8467 5.93333 11.2667 6.19333 11.5267C6.45333 11.7867 6.87333 11.7867 7.13333 11.5267L10.1933 8.46667C10.4533 8.20667 10.4533 7.78667 10.1933 7.52667L7.13333 4.46667C6.88 4.21333 6.45333 4.21333 6.19333 4.47333Z"/></svg></button></li>
+      <li><button type="button" class="menu-item" data-depth="size"><i class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 4.66667C8.36667 4.66667 8.66667 4.96667 8.66667 5.33333V8C8.66667 8.36667 8.36667 8.66667 8 8.66667C7.63333 8.66667 7.33333 8.36667 7.33333 8V5.33333C7.33333 4.96667 7.63333 4.66667 8 4.66667ZM7.99333 1.33333C4.31333 1.33333 1.33333 4.32 1.33333 8C1.33333 11.68 4.31333 14.6667 7.99333 14.6667C11.68 14.6667 14.6667 11.68 14.6667 8C14.6667 4.32 11.68 1.33333 7.99333 1.33333ZM8 13.3333C5.05333 13.3333 2.66667 10.9467 2.66667 8C2.66667 5.05333 5.05333 2.66667 8 2.66667C10.9467 2.66667 13.3333 5.05333 13.3333 8C13.3333 10.9467 10.9467 13.3333 8 13.3333ZM8.66667 11.3333H7.33333V10H8.66667V11.3333Z"/></svg></i><span>사이즈</span><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.19333 4.47333C5.93333 4.73333 5.93333 5.15333 6.19333 5.41333L8.78 8L6.19333 10.5867C5.93333 10.8467 5.93333 11.2667 6.19333 11.5267C6.45333 11.7867 6.87333 11.7867 7.13333 11.5267L10.1933 8.46667C10.4533 8.20667 10.4533 7.78667 10.1933 7.52667L7.13333 4.46667C6.88 4.21333 6.45333 4.21333 6.19333 4.47333Z"/></svg></button></li>
+      <li><button type="button" class="menu-item" data-depth="shopmenu"><i class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 4.66667C8.36667 4.66667 8.66667 4.96667 8.66667 5.33333V8C8.66667 8.36667 8.36667 8.66667 8 8.66667C7.63333 8.66667 7.33333 8.36667 7.33333 8V5.33333C7.33333 4.96667 7.63333 4.66667 8 4.66667ZM7.99333 1.33333C4.31333 1.33333 1.33333 4.32 1.33333 8C1.33333 11.68 4.31333 14.6667 7.99333 14.6667C11.68 14.6667 14.6667 11.68 14.6667 8C14.6667 4.32 11.68 1.33333 7.99333 1.33333ZM8 13.3333C5.05333 13.3333 2.66667 10.9467 2.66667 8C2.66667 5.05333 5.05333 2.66667 8 2.66667C10.9467 2.66667 13.3333 5.05333 13.3333 8C13.3333 10.9467 10.9467 13.3333 8 13.3333ZM8.66667 11.3333H7.33333V10H8.66667V11.3333Z"/></svg></i><span>상점 메뉴 표기 방식</span><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.19333 4.47333C5.93333 4.73333 5.93333 5.15333 6.19333 5.41333L8.78 8L6.19333 10.5867C5.93333 10.8467 5.93333 11.2667 6.19333 11.5267C6.45333 11.7867 6.87333 11.7867 7.13333 11.5267L10.1933 8.46667C10.4533 8.20667 10.4533 7.78667 10.1933 7.52667L7.13333 4.46667C6.88 4.21333 6.45333 4.21333 6.19333 4.47333Z"/></svg></button></li>
+    </ul>
+  </div>
+
+  <div class="depth is-hidden" id="depthOther">
+    <div class="depth-head"><button type="button" class="back-btn" data-back aria-label="뒤로"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9.80667 4.47333C10.0667 4.73333 10.0667 5.15333 9.80667 5.41333L7.22 8L9.80667 10.5867C10.0667 10.8467 10.0667 11.2667 9.80667 11.5267C9.54667 11.7867 9.12667 11.7867 8.86667 11.5267L5.80667 8.46667C5.54667 8.20667 5.54667 7.78667 5.80667 7.52667L8.86667 4.46667C9.12 4.21333 9.54667 4.21333 9.80667 4.47333Z"/></svg></button><h2 id="otherTitle"></h2></div>
+    <p class="empty-depth">이 프로토타입에서는 컬러 설정만 제공합니다.</p>
+  </div>
+
+  <div class="depth is-hidden" id="depthColor">
+  <div class="depth-head"><button type="button" class="back-btn" data-back aria-label="뒤로"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9.80667 4.47333C10.0667 4.73333 10.0667 5.15333 9.80667 5.41333L7.22 8L9.80667 10.5867C10.0667 10.8467 10.0667 11.2667 9.80667 11.5267C9.54667 11.7867 9.12667 11.7867 8.86667 11.5267L5.80667 8.46667C5.54667 8.20667 5.54667 7.78667 5.80667 7.52667L8.86667 4.46667C9.12 4.21333 9.54667 4.21333 9.80667 4.47333Z"/></svg></button><h2>컬러</h2></div>
+
+  <section class="group">
+    <h2 class="group-title">기본 컬러</h2>
+    <p class="hint group-desc" id="solidHint"></p>
+    <div class="scheme-row">
+      <i class="chip" id="schemeChip"></i>
+      <select class="ui" id="scheme" autocomplete="off">
+        <option value="base">Base</option>
+        <option value="muted">Muted</option>
+        <option value="inverted">Inverted</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+
+    <div class="custom is-hidden" id="customPanel">
+      <div id="customFields"></div>
+      <div class="custom-actions">
+        <span>불러오기</span>
+        <button type="button" class="link-btn" data-load="base">Base</button>
+        <button type="button" class="link-btn" data-load="muted">Muted</button>
+        <button type="button" class="link-btn" data-load="inverted">Inverted</button>
+      </div>
+    </div>
+
+    <div class="logo-row">
+      <span id="solidLogoLabel">로고 컬러</span>
+      <div class="seg logo-seg" id="solidLogo" role="group" aria-labelledby="solidLogoLabel">
+        <button type="button" data-logo="light">밝은</button>
+        <button type="button" data-logo="dark">어두운</button>
+        <button type="button" data-logo="auto">자동</button>
+      </div>
+    </div>
+    <p class="hint">로고는 <a class="text-link" href="#" onclick="return false">브랜드 가이드</a>에서 설정 가능해요.</p>
+  </section>
+
+  <section class="group" id="overlapGroup" data-only="color">
+    <div class="group-title">
+      <label for="overlapA">헤더 겹치기</label>
+      <span class="switch"><input type="checkbox" id="overlapA" role="switch" checked><span></span></span>
+    </div>
+    <p class="hint" id="overlapHint"></p>
+
+    <p class="hint is-hidden" id="insetHintA">Inset형 헤더는 불투명한 컨테이너 위에 전경이 놓이므로, 겹쳐도 기본 컬러를 그대로 씁니다. (어두운 · 밝은 미디어 위 컬러 미제공)</p>
+    <div class="sub" id="onGroup">
+      <p class="sub-label">겹쳤을 때 컬러</p>
+      <div class="seg" id="onSeg">
+        <button type="button" data-v="dark"><i class="chip" data-tone-chip="dark" style="--b:#3f3f46;--c:#ffffff"></i>어두운 미디어 위</button>
+        <button type="button" data-v="light"><i class="chip" data-tone-chip="light" style="--b:#e4e4e7;--c:#1a1a1a"></i>밝은 미디어 위</button>
+        <button type="button" data-v="auto"><i class="chip" style="--b:linear-gradient(135deg,#3f3f46 50%,#e4e4e7 50%);--c:transparent"></i>자동</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- B안·C안: the overlap options live elsewhere, so the tone rows get their own section -->
+  <section class="group is-hidden" id="onCustomGroup">
+    <h2 class="group-title">미디어 위 컬러</h2>
+    <div id="onIntro">
+      <p class="sub-label on-sub" data-only="color">미디어 위 컬러</p>
+      <p class="hint group-desc">헤더가 미디어 위에 겹쳐 있을 때 쓰는 컬러예요. 미디어의 밝기에 따라 어두운 · 밝은 미디어 위 컬러가 적용돼요.</p>
+    </div>
+    <!-- B안: tones stacked vertically, logo picked once per page at the bottom -->
+    <div class="custom" id="onTonesB" data-only="display"></div>
+    <div class="logo-row" id="pageLogoRow" data-only="color display">
+      <span id="pageLogoLabel">로고 컬러</span>
+      <div class="seg logo-seg" id="pageLogo" role="group" aria-labelledby="pageLogoLabel">
+        <button type="button" data-v="light">밝은</button>
+        <button type="button" data-v="dark">어두운</button>
+        <button type="button" data-v="auto">자동</button>
+      </div>
+    </div>
+  </section>
+  <div class="tones" id="onTones" data-only="color stage"></div>
+
+  <!-- shown while colours are being edited; stays at the bottom of the panel -->
+  <div class="auto-show is-hidden" id="autoShowWrap">
+    <label for="autoShow">컬러 수정 중인 화면 자동 보기</label>
+    <span class="switch"><input type="checkbox" id="autoShow" role="switch" checked aria-describedby="autoShowTip"><span></span></span>
+    <div class="coach" id="autoShowTip" role="status" hidden>
+      <p>컬러를 수정하면 그 컬러가 쓰이는 화면을 미리보기에 자동으로 보여줘요. 여기서 끌 수 있어요.</p>
+      <button type="button" class="coach-close" aria-label="안내 닫기">확인</button>
+    </div>
+  </div>
+  </div>
+</aside>
+
+<main class="stage" id="stage">
+  <div class="stage-inner" id="stageInner">
+    <div class="stage-tools">
+      <label class="tool-select"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M3.03625 6.86577L3.03623 13.1653H6.19579V11.1065C6.19579 10.3333 6.82259 9.70652 7.59579 9.70652H8.40378C9.17698 9.70652 9.80378 10.3333 9.80378 11.1065V13.1653H12.9634V6.86577L7.99983 2.94449L3.03625 6.86577ZM7.58656 1.91161C7.82884 1.72021 8.17083 1.72021 8.4131 1.91161L13.7767 6.14889C13.9367 6.27532 14.0301 6.46805 14.0301 6.67201V13.5653C14.0301 13.9335 13.7316 14.2319 13.3634 14.2319H9.40378C9.03559 14.2319 8.73711 13.9335 8.73711 13.5653V11.1065C8.73711 10.9224 8.58787 10.7732 8.40378 10.7732H7.59579C7.4117 10.7732 7.26246 10.9224 7.26246 11.1065V13.5653C7.26246 13.9335 6.96398 14.2319 6.59579 14.2319H2.63623C2.26804 14.2319 1.96956 13.9335 1.96957 13.5653L1.96958 6.67201C1.96958 6.46805 2.06294 6.27532 2.22298 6.14889L7.58656 1.91161Z"/></svg>
+        <select id="page" autocomplete="off" aria-label="미리보기 페이지">
+          <option value="home-dark">Main · 어두운 히어로</option>
+          <option value="home-light">Main · 밝은 히어로</option>
+          <option value="sub">Sub · 히어로 없음</option>
+        </select><svg class="caret" viewBox="0 0 14 14" aria-hidden="true"><path fill="currentColor" d="M9.26333 5.41917L7 7.6825L4.73667 5.41917C4.50917 5.19167 4.14167 5.19167 3.91417 5.41917C3.68667 5.64667 3.68667 6.01417 3.91417 6.24167L6.59167 8.91917C6.81917 9.14667 7.18667 9.14667 7.41417 8.91917L10.0917 6.24167C10.3192 6.01417 10.3192 5.64667 10.0917 5.41917C9.86417 5.1975 9.49083 5.19167 9.26333 5.41917Z"/></svg>
+      </label>
+      <div class="tools-right">
+        <div class="overlap-inline" id="overlapC" data-only="stage" data-in-color>
+          <label class="ov-toggle" for="overlapCToggle">헤더 겹치기
+            <span class="switch"><input type="checkbox" id="overlapCToggle" role="switch"><span></span></span>
+          </label>
+          <div class="seg" id="onSegC" aria-label="겹쳤을 때 컬러">
+            <button type="button" data-v="dark"><i class="chip" data-tone-chip="dark" style="--b:#3f3f46;--c:#ffffff"></i>어두운 미디어 위</button>
+            <button type="button" data-v="light"><i class="chip" data-tone-chip="light" style="--b:#e4e4e7;--c:#1a1a1a"></i>밝은 미디어 위</button>
+            <button type="button" data-v="auto"><i class="chip" style="--b:linear-gradient(135deg,#3f3f46 50%,#e4e4e7 50%);--c:transparent"></i>자동</button>
+          </div>
+        </div>
+      <div class="display-wrap" id="displayWrap" data-only="display">
+        <button type="button" class="tool-select tool-btn" id="displayBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="displayPop"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 4.66667C8.36667 4.66667 8.66667 4.96667 8.66667 5.33333V8C8.66667 8.36667 8.36667 8.66667 8 8.66667C7.63333 8.66667 7.33333 8.36667 7.33333 8V5.33333C7.33333 4.96667 7.63333 4.66667 8 4.66667ZM7.99333 1.33333C4.31333 1.33333 1.33333 4.32 1.33333 8C1.33333 11.68 4.31333 14.6667 7.99333 14.6667C11.68 14.6667 14.6667 11.68 14.6667 8C14.6667 4.32 11.68 1.33333 7.99333 1.33333ZM8 13.3333C5.05333 13.3333 2.66667 10.9467 2.66667 8C2.66667 5.05333 5.05333 2.66667 8 2.66667C10.9467 2.66667 13.3333 5.05333 13.3333 8C13.3333 10.9467 10.9467 13.3333 8 13.3333ZM8.66667 11.3333H7.33333V10H8.66667V11.3333Z"/></svg><span>헤더 표시</span><span class="ov-badge" id="displayBadge"><i></i><b></b></span><svg class="caret" viewBox="0 0 14 14" aria-hidden="true"><path fill="currentColor" d="M9.26333 5.41917L7 7.6825L4.73667 5.41917C4.50917 5.19167 4.14167 5.19167 3.91417 5.41917C3.68667 5.64667 3.68667 6.01417 3.91417 6.24167L6.59167 8.91917C6.81917 9.14667 7.18667 9.14667 7.41417 8.91917L10.0917 6.24167C10.3192 6.01417 10.3192 5.64667 10.0917 5.41917C9.86417 5.1975 9.49083 5.19167 9.26333 5.41917Z"/></svg></button>
+        <div class="pop" id="displayPop" role="dialog" aria-label="헤더 표시" hidden>
+          <div class="pop-row">
+            <div>
+              <p class="pop-title" id="ovTitle">첫 섹션 위에 겹쳐 표시</p>
+              <p class="pop-desc">헤더가 첫 번째 섹션 위에 겹쳐 표시됩니다.</p>
+            </div>
+            <span class="switch green"><input type="checkbox" id="overlap" role="switch" aria-labelledby="ovTitle"><span></span></span>
+          </div>
+          <div class="pop-box" id="ovColors">
+            <p class="pop-desc">배경에 맞는 컬러를 자동으로 적용하거나 직접 선택할 수 있어요.</p>
+            <div class="pick-row"><span>일반 컬러</span><button type="button" class="pick" data-pick="on" aria-haspopup="listbox"><b></b><svg class="caret" viewBox="0 0 14 14" aria-hidden="true"><path fill="currentColor" d="M9.26333 5.41917L7 7.6825L4.73667 5.41917C4.50917 5.19167 4.14167 5.19167 3.91417 5.41917C3.68667 5.64667 3.68667 6.01417 3.91417 6.24167L6.59167 8.91917C6.81917 9.14667 7.18667 9.14667 7.41417 8.91917L10.0917 6.24167C10.3192 6.01417 10.3192 5.64667 10.0917 5.41917C9.86417 5.1975 9.49083 5.19167 9.26333 5.41917Z"/></svg></button></div>
+            <p class="pop-desc is-hidden" id="insetHint">Inset형 헤더는 데스크톱에서 항상 기본 컬러로 표시되고, 모바일에만 적용돼요.</p>
+          </div>
+          <ul class="pick-menu" id="pickMenu" role="listbox" hidden></ul>
+        </div>
+      </div>
+      </div>
+    </div>
+    <div class="previews" id="previews"></div>
+  </div>
+</main>
+
+<template id="desktopTpl">
+  <div class="pane desktop">
+    <div class="frame">
+      <div class="viewport">
+      <div class="dim"></div>
+      <div class="scroller">
+        <header class="hdr">
+          <div class="hdr-inner">
+          <div class="hdr-bar">
+            <nav class="hdr-nav">
+              <a class="hdr-item" data-depth2><span>Shop</span></a>
+              <a class="hdr-item"><span>About</span></a>
+              <a class="hdr-item"><span>Journal</span></a>
+              <a class="hdr-item"><span>Info</span></a>
+              <a class="hdr-item"><span>The Story</span></a>
+            </nav>
+            <div class="hdr-logo" role="img" aria-label="BRAND"></div>
+            <div class="hdr-util">
+              <a class="hdr-item" data-search><span>Search</span></a>
+              <a class="hdr-item"><span>Sign in</span></a>
+              <a class="hdr-item"><span>Bag (0)</span></a>
+            </div>
+          </div>
+          <div class="hdr-menu">
+            <a>new arrivals</a><a>Essentials</a><a>Classics</a><a>Jackets</a>
+            <a>tops</a><a>skirts</a><a>dresses</a><a>accessories</a>
+          </div>
+          <div class="hdr-search">
+            <div class="search-bar">
+              <label class="search-field">
+                <span class="search-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M9.15853 3.87695C11.9307 3.87717 14.1787 6.12432 14.1789 8.89648C14.1789 10.236 13.6521 11.4516 12.797 12.3519L15.7438 15.2979C15.8087 15.3629 15.8086 15.468 15.7438 15.533L15.5086 15.7699L15.2718 16.005C15.2067 16.0698 15.1016 16.0699 15.0366 16.005L12.0386 13.007C11.2231 13.5796 10.2305 13.9167 9.15853 13.9168C6.38612 13.9168 4.13818 11.6689 4.13818 8.89648C4.13836 6.12422 6.38623 3.87702 9.15853 3.87695ZM9.15853 4.8763C6.93851 4.87636 5.13852 6.6765 5.13835 8.89648C5.13835 11.1166 6.93841 12.9166 9.15853 12.9167C11.3785 12.9164 13.1787 11.1165 13.1787 8.89648C13.1785 6.6766 11.3784 4.87652 9.15853 4.8763Z"/></svg></span>
+                <input type="text" aria-label="검색" placeholder="Search" autocomplete="off">
+              </label>
+            </div>
+            <div class="search-result">
+              <p class="search-label">검색 결과</p>
+              <div class="search-list">
+                <a>Product Name</a><a>CH 03 Essence Lounge Desert Taupe</a>
+                <a>Square Moduler Coffee Table</a><a>Handcrafted Solid Oak Object Natural Finish</a>
+              </div>
+            </div>
+          </div>
+          </div>
+        </header>
+        <div class="page"></div>
+      </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="mobileTpl">
+  <div class="pane mobile">
+    <div class="frame m">
+      <div class="viewport">
+        <div class="m-screen">
+          <div class="scroller">
+            <header class="hdr">
+              <div class="hdr-inner">
+                <div class="hdr-bar">
+                  <button type="button" class="mh-btn" data-menu>Menu</button>
+                  <div class="hdr-logo" role="img" aria-label="BRAND"></div>
+                  <a class="mh-btn end">Bag (0)</a>
+                </div>
+                <div class="m-menu" data-depth="1">
+                  <div>
+                    <div class="search-bar">
+                      <label class="search-field">
+                        <span class="search-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M9.15853 3.87695C11.9307 3.87717 14.1787 6.12432 14.1789 8.89648C14.1789 10.236 13.6521 11.4516 12.797 12.3519L15.7438 15.2979C15.8087 15.3629 15.8086 15.468 15.7438 15.533L15.5086 15.7699L15.2718 16.005C15.2067 16.0698 15.1016 16.0699 15.0366 16.005L12.0386 13.007C11.2231 13.5796 10.2305 13.9167 9.15853 13.9168C6.38612 13.9168 4.13818 11.6689 4.13818 8.89648C4.13836 6.12422 6.38623 3.87702 9.15853 3.87695ZM9.15853 4.8763C6.93851 4.87636 5.13852 6.6765 5.13835 8.89648C5.13835 11.1166 6.93841 12.9166 9.15853 12.9167C11.3785 12.9164 13.1787 11.1165 13.1787 8.89648C13.1785 6.6766 11.3784 4.87652 9.15853 4.8763Z"/></svg></span>
+                        <input type="text" aria-label="검색" placeholder="검색어를 입력하세요" autocomplete="off">
+                      </label>
+                    </div>
+                    <div class="m-search is-empty"><div class="search-result">
+              <p class="search-label">검색 결과</p>
+              <div class="search-list">
+                <a>Product Name</a><a>CH 03 Essence Lounge Desert Taupe</a>
+                <a>Square Moduler Coffee Table</a><a>Handcrafted Solid Oak Object Natural Finish</a>
+              </div>
+            </div></div>
+                    <div class="m-list depth1">
+                      <a class="m-item" data-to2><span>shop</span><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9.63443 4.14927C9.68775 4.09847 9.77216 4.10051 9.82296 4.15385L13.2232 7.72394C13.3701 7.87836 13.3701 8.12093 13.2232 8.27537L9.82296 11.8461C9.77216 11.8994 9.68775 11.9015 9.63442 11.8507L9.24806 11.4826C9.19476 11.4318 9.19271 11.3474 9.24349 11.2941L12.2931 8.09194C12.3422 8.04044 12.3422 7.95952 12.2931 7.90803L9.24349 4.70589C9.19271 4.65257 9.19476 4.56819 9.24806 4.5174L9.63443 4.14927Z"/></svg></a>
+                      <a class="m-item"><span>about</span></a>
+                      <a class="m-item"><span>Journal</span></a>
+                      <a class="m-item"><span>Info</span></a>
+                      <a class="m-item"><span>the story</span></a>
+                    </div>
+                    <div class="m-list depth2">
+                      <a class="m-back" data-to1><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.36559 11.8507C6.31227 11.9015 6.22786 11.8994 6.17706 11.8461L2.77685 8.27602C2.62992 8.1216 2.62996 7.87903 2.77685 7.72459L6.17707 4.15385C6.22786 4.10051 6.31228 4.09846 6.3656 4.14927L6.75196 4.5174C6.80526 4.56818 6.80731 4.65256 6.75653 4.70588L3.70688 7.90802C3.65783 7.95952 3.65783 8.04044 3.70688 8.09193L6.75653 11.2941C6.80731 11.3474 6.80526 11.4318 6.75196 11.4826L6.36559 11.8507Z"/></svg><span>Shop</span></a>
+                      <a class="m-item"><span>new arrivals</span></a><a class="m-item"><span>Essentials</span></a>
+                      <a class="m-item"><span>Classics</span></a><a class="m-item"><span>jackets</span></a>
+                      <a class="m-item"><span>tops</span></a><a class="m-item"><span>skirts</span></a>
+                      <a class="m-item"><span>dresses</span></a><a class="m-item"><span>accessories</span></a>
+                    </div>
+                  </div>
+                  <div class="m-utility"><a>Sign in</a></div>
+                </div>
+              </div>
+            </header>
+            <div class="page"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<div class="cpick" id="cpick" role="dialog" aria-label="컬러 선택" hidden>
+  <div class="cp-sv" id="cpSV"><span class="cp-handle" id="cpSVh"></span></div>
+  <div class="cp-track cp-hue" id="cpHue"><span class="cp-handle" id="cpHueh"></span></div>
+  <div class="cp-track cp-alpha checker" id="cpAlpha"><span class="cp-handle" id="cpAlphah"></span></div>
+  <div class="cp-input">
+    <span>HEX</span>
+    <div class="cp-field">
+      <label># <input id="cpHex" maxlength="6" spellcheck="false" aria-label="HEX"></label>
+      <label><input id="cpPct" class="pct" inputmode="numeric" maxlength="3" aria-label="불투명도"> %</label>
+    </div>
+  </div>
+  <div class="cp-blur" id="cpBlur" hidden>
+    <div class="cp-blur-head">
+      <label for="cpBlurOn">배경 블러</label>
+      <span class="switch"><input type="checkbox" id="cpBlurOn" role="switch"><span></span></span>
+    </div>
+    <div class="cp-blur-row" id="cpBlurAmount">
+      <input type="range" id="cpBlurRange" min="1" max="30" step="1" aria-label="블러 강도">
+      <output id="cpBlurOut" for="cpBlurRange"></output>
+    </div>
+    <p id="cpBlurHint">배경 불투명도를 100% 미만으로 낮추면 헤더 뒤 콘텐츠가 흐리게 비쳐 보여요.</p>
+  </div>
+</div>
+
+<script>
+const DESKTOP_W = 1920, DESKTOP_H = 1080;
+const MOBILE_W = 390, MOBILE_H = 844;
+
+const SETS = ['04', '05', '08'];
+// 05+06 and 08+09 each share one option
+const SET_LABEL = { '05': '05/06', '08': '08/09' };
+const setLabel = n => SET_LABEL[n] || n;
+const ENABLED_SETS = ['05', '08'];
+const SET_INFO = {
+  '04': { desc: '준비 중' },
+  '05': { desc: '풀폭 헤더 · 겹치기 지원', inset: false },
+  '08': { desc: 'Inset형 헤더 · 항상 solid', inset: true },
+};
+
+/* header-solid schemes — Figma "Color (테스트용)" collection, modes base / muted / inverted.
+   Editable roles, grouped for the Custom panel; every other token in the collection resolves to one of them. */
+const ROLES = [
+  { group: '헤더 · 메뉴' },
+  { key: 'bg',           label: '배경' },
+  { key: 'nav',          label: '메뉴 텍스트' },
+  { key: 'utility',      label: '유틸리티 텍스트' },
+  { key: 'hover',        label: '호버' },
+  { key: 'secondary',    label: '보조 텍스트' },
+  { group: '검색' },
+  { key: 'sInput',       label: '입력 텍스트' },
+  { key: 'sIcon',        label: '아이콘' },
+  { key: 'sPlaceholder', label: 'placeholder' },
+  { key: 'sLine',        label: '구분선' },
+  { key: 'sLineActive',  label: '구분선 (입력 중)' },
+  { key: 'sLabel',       label: '결과 라벨' },
+  { key: 'sResult',      label: '결과 텍스트' },
+  { key: 'sResultHover', label: '결과 호버' },
+];
+const scheme = (c, line, lineActive) => ({
+  ...c,
+  sInput: c.nav, sIcon: c.nav, sPlaceholder: lineActive, sLine: line, sLineActive: lineActive,
+  sLabel: c.secondary, sResult: c.nav, sResultHover: c.hover, blurOn: false, blur: 8,
+});
+const SCHEMES = {  // blur: background backdrop blur in px (0 for presets)
+  base:     scheme({ bg: '#ffffff', nav: '#1a1a1a', utility: '#1a1a1a', hover: '#c4451c', secondary: '#5e5b57' }, '#e4e1dc', '#97938d'),
+  muted:    scheme({ bg: '#f7f5f2', nav: '#1a1a1a', utility: '#1a1a1a', hover: '#c4451c', secondary: '#5e5b57' }, '#e4e1dc', '#97938d'),
+  inverted: scheme({ bg: '#1f1e1d', nav: '#ffffff', utility: '#ffffff', hover: '#ffffffb8', secondary: '#ffffffd9' }, '#ffffff29', '#ffffff80'),
+};
+/* header on media — on dark / on light: 배경 and 전경 (menu + utility text) colours, plus a light or dark logo */
+const TONE_LABEL = { dark: '어두운 미디어 위', light: '밝은 미디어 위' };
+const ON_PRESETS = {  // Figma "Header On Media (테스트용)"; the starting point of each editable tone
+  dark:  { bg: '#ffffff00', fg: '#ffffff', logo: 'light', blurOn: false, blur: 8 },
+  light: { bg: '#ffffff00', fg: '#1a1a1a', logo: 'dark',  blurOn: false, blur: 8 },
+};
+const BACKDROP = '#0f0e0d59';
+const isSearchKey = k => /^s[A-Z]/.test(k);
+const needsEmptySearch = k => k === 'sPlaceholder' || k === 'sLine';
+
+const state = {
+  set: '05',
+  // header overlap is set per page; 'auto' picks on dark / on light from the hero tone
+  pages: {
+    'home-dark':  { overlap: true,  on: 'auto', logo: 'auto' },
+    'home-light': { overlap: true,  on: 'auto', logo: 'auto' },
+    'sub':        { overlap: false, on: 'auto', logo: 'auto' },
+  },
+  scheme: 'base',
+  solidLogo: 'auto',       // 기본 컬러 로고: 'light' | 'dark' | 'auto' (from the background brightness)
+  custom: { ...SCHEMES.base },
+  customEdited: false,
+  onColors: { dark: { ...ON_PRESETS.dark }, light: { ...ON_PRESETS.light } }, // editable on dark / on light, shared by every page
+  onEdited: false, // user has started editing 미디어 위 컬러
+  mode: 'color',   // A안 'color': overlap in the 컬러 menu · B안 'display': 헤더 표시 popover
+  view: 'default', // 헤더 표시: default / hover / scroll / menu / search
+  page: 'home-dark',
+};
+const pageCfg = () => state.pages[state.page];
+const canOverlap = () => PAGES[state.page].fullBleed;
+const isOverlap = () => canOverlap() && pageCfg().overlap;
+const heroTone = () => PAGES[state.page].hero ? PAGES[state.page].hero.tone : 'dark';
+const onTone = () => pageCfg().on === 'auto' ? (PAGES[state.page].hero ? PAGES[state.page].hero.tone : 'dark') : pageCfg().on;
+// 자동 보기 is offered once colours are being customised: Custom scheme, or 미디어 위 컬러 touched
+const isCustomizing = () => state.scheme === 'custom' || state.onEdited;
+// A안·B안 로고 컬러 (per page) overrides the tone's logo unless 자동 · C안 picks a logo per tone
+const overlapLogo = () => state.mode !== 'stage' && pageCfg().logo !== 'auto' ? pageCfg().logo : state.onColors[onTone()].logo;
+// 자동: light logo on a dark background, dark logo on a light one (alpha ignored)
+const solidLogo = c => {
+  if (state.solidLogo !== 'auto') return state.solidLogo;
+  const { r, g, b } = hexToRgba(c.bg);
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 140 ? 'light' : 'dark';
+};
+const colors = () => state.scheme === 'custom' ? state.custom : SCHEMES[state.scheme];
+
+function tokenVars(c) {
+  return {
+    '--solid-logo': solidLogo(c) === 'light' ? '#ffffff' : '#1a1a1a',
+    '--solid-bg': c.bg, '--solid-nav': c.nav, '--solid-utility': c.utility, '--solid-nav-hover': c.hover,
+    '--menu-bg': c.bg, '--menu-nav': c.nav, '--menu-nav-hover': c.hover, '--menu-secondary': c.secondary,
+    '--search-bg': c.bg, /* search shares the menu background */ '--search-line': c.sLine, '--search-line-active': c.sLineActive, '--search-placeholder': c.sPlaceholder,
+    '--search-input': c.sInput, '--search-icon': c.sIcon, '--search-label': c.sLabel,
+    '--search-result': c.sResult, '--search-result-hover': c.sResultHover,
+    '--header-backdrop': BACKDROP,
+    '--header-blur': (c.blurOn ? c.blur : 0) + 'px',
+  };
+}
+
+const PAGES = {
+  'home-dark':  { fullBleed: true,  hero: { src: 'assets/hero-dark.jpg',  tone: 'dark',  sub: 'Less, but better', title: 'Crafted for Better Experience' } },
+  'home-light': { fullBleed: true,  hero: { src: 'assets/hero-light.jpg', tone: 'light', sub: '', title: '' } },
+  'sub':        { fullBleed: false },
+};
+
+function cards(n) {
+  return Array.from({ length: n }, (_, i) =>
+    `<div class="card"><div class="ph"></div><div class="t">Product name ${i + 1}</div><div class="p">₩ 128,000</div></div>`).join('');
+}
+
+function pageHTML(key) {
+  const p = PAGES[key];
+  const hero = p.hero ? `
+    <section class="hero" data-tone="${p.hero.tone}">
+      <img src="${p.hero.src}" alt="">
+      <div class="hero-overlay"></div>
+      ${p.hero.title ? `<div class="hero-content"><p>${p.hero.sub}</p><h2>${p.hero.title}</h2></div>` : ''}
+      <div class="hero-dots"><i></i><i></i><i></i><i></i><i></i></div>
+    </section>` : `
+    <section class="section">
+      <div class="crumb">Home / Shop</div>
+      <h1 class="title">New Arrivals</h1>
+      <div class="grid">${cards(8)}</div>
+    </section>`;
+  return `${hero}
+    <section class="section"><h3>New Arrivals</h3><div class="grid">${cards(4)}</div></section>
+    <div class="band">Less, but better.</div>
+    <section class="section"><h3>Best Sellers</h3><div class="grid">${cards(8)}</div></section>`;
+}
+
+/* shared pane plumbing: colour tokens, page content, scroll state */
+function basePane(node, width, height) {
+  const frame = node.querySelector('.frame');
+  const viewport = node.querySelector('.viewport');
+  const scroller = node.querySelector('.scroller');
+  const hdr = node.querySelector('.hdr');
+  const page = node.querySelector('.page');
+  const status = node.querySelector('.status');
+  viewport.style.setProperty('--vw', width + 'px');
+
+  new ResizeObserver(() => {
+    const scale = frame.clientWidth / width;
+    viewport.style.height = (height || frame.clientHeight / scale) + 'px';
+    viewport.style.transform = `scale(${scale})`;
+  }).observe(frame);
+
+  return {
+    frame, scroller, hdr, page, status,
+    paint() {
+      frame.dataset.set = state.set;
+      frame.dataset.on = onTone();
+      for (const [k, v] of Object.entries(tokenVars(colors()))) frame.style.setProperty(k, v);
+      // on-media colours and logo of the tone in use
+      const oc = state.onColors[onTone()];
+      const ov = {
+        '--overlap-bg': oc.bg, '--overlap-nav': oc.fg, '--overlap-utility': oc.fg,
+        '--overlap-logo': overlapLogo() === 'light' ? '#ffffff' : '#1a1a1a', '--overlap-blur': oc.blurOn && oc.blur + 'px',
+      };
+      for (const [k, v] of Object.entries(ov)) v ? frame.style.setProperty(k, v) : frame.style.removeProperty(k);
+    },
+    statusHTML(solid, reason) {
+      if (!status) return;
+      const name = state.scheme === 'custom' ? 'custom' : state.scheme;
+      status.innerHTML = solid
+        ? `<b>header-solid</b> · ${name} <span style="opacity:.6">(${reason})</span>`
+        : `<b>header-on-media</b> · on-${onTone()}${pageCfg().on === 'auto' ? ' · 자동' : ''} <span style="opacity:.6">(겹침 · default)</span>`;
+    },
+  };
+}
+
+/* ── Desktop pane: hover always switches to solid ── */
+function createDesktop() {
+  const node = document.getElementById('desktopTpl').content.firstElementChild.cloneNode(true);
+  const p = basePane(node, DESKTOP_W, DESKTOP_H);
+  const { frame, scroller, hdr, page } = p;
+  const local = { hovered: false, open: false, scrolled: false, search: false, forced: false };
+  const search = node.querySelector('.hdr-search');
+  const searchInput = search.querySelector('input');
+
+  function render() {
+    const overlapActive = isOverlap();
+    const inset = SET_INFO[state.set].inset;
+    const hoverSolid = local.hovered || local.open;
+    const solid = inset || !overlapActive || local.scrolled || hoverSolid || local.search || local.forced;
+
+    p.paint();
+    frame.classList.toggle('is-dimmed', local.open || local.search);
+    frame.classList.toggle('is-searching', local.search);
+    page.classList.toggle('is-under', overlapActive);
+    hdr.classList.toggle('is-transparent', !solid);
+    hdr.classList.toggle('is-open', local.open);
+    hdr.classList.toggle('is-search', local.search);
+    hdr.querySelector('[data-depth2]').classList.toggle('is-open', local.open);
+    hdr.querySelector('[data-search]').classList.toggle('is-open', local.search);
+    search.classList.toggle('is-empty', !searchInput.value.trim());
+
+    const reason = local.forced ? '컬러 보기' : local.search ? 'search' : inset ? (overlapActive ? 'inset · 겹침' : 'inset') : !overlapActive ? '겹치지 않음' : local.scrolled ? 'scrolled' : hoverSolid ? 'hover' : 'default';
+    p.statusHTML(solid, reason);
+  }
+
+  // any real interaction ends an auto-shown preview state
+  function clearForced() {
+    if (!local.forced) return;
+    local.forced = false;
+    node.querySelectorAll('.is-hover').forEach(el => el.classList.remove('is-hover'));
+    viewReleased();
+  }
+  frame.addEventListener('pointerdown', clearForced, true);
+  hdr.addEventListener('mouseenter', () => { clearForced(); local.hovered = true; render(); });
+  hdr.addEventListener('mouseleave', () => { local.hovered = false; local.open = false; render(); });
+  hdr.querySelectorAll('.hdr-bar .hdr-item').forEach(item => {
+    // while search is open, hovering nav items doesn't swap in the 2depth menu
+    item.addEventListener('mouseenter', () => { if (local.search) return; local.open = item.hasAttribute('data-depth2'); render(); });
+  });
+  // leaving the bar for empty bar space (not the menu) closes 2depth
+  hdr.querySelector('.hdr-bar').addEventListener('mousemove', e => {
+    if (local.open && !e.target.closest('.hdr-item')) { local.open = false; render(); }
+  });
+
+  // search: click to open/close, click dim or Esc to close
+  function setSearch(open) {
+    local.search = open;
+    local.open = false;
+    if (open) {
+      if (!searchInput.value) searchInput.value = 'Product'; // typing state from the design
+      setTimeout(() => { searchInput.focus({ preventScroll: true }); searchInput.select(); }, 50);
+    }
+    render();
+  }
+  hdr.querySelector('[data-search]').addEventListener('click', () => setSearch(!local.search));
+  node.querySelector('.dim').addEventListener('click', () => { if (local.search) setSearch(false); });
+  searchInput.addEventListener('input', render);
+  searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') setSearch(false); });
+  scroller.addEventListener('scroll', () => {
+    const s = scroller.scrollTop > 0;
+    if (s !== local.scrolled) { local.scrolled = s; render(); }
+  }, { passive: true });
+
+  return {
+    node, render,
+    setPage() { page.innerHTML = pageHTML(state.page); scroller.scrollTop = 0; local.scrolled = false; render(); },
+    // 헤더 표시: put the preview into a given state (opts come from the custom colour being edited)
+    setView(view, opts = {}) {
+      node.querySelectorAll('.is-hover').forEach(el => el.classList.remove('is-hover'));
+      Object.assign(local, { hovered: false, open: false, search: false, forced: false });
+      scroller.scrollTop = view === 'scroll' ? SCROLL_Y : 0;
+      if (view === 'hover') local.forced = true;
+      if (view === 'menu') { local.forced = true; local.open = true; }
+      if (view === 'search') {
+        local.forced = true; local.search = true;
+        searchInput.value = opts.emptySearch ? '' : 'Product';
+      } else searchInput.value = '';
+      if (opts.hoverMark) hdr.querySelector('.hdr-menu a').classList.add('is-hover');
+      if (opts.resultHover) search.querySelector('.search-list a').classList.add('is-hover');
+      render();
+    },
+  };
+}
+
+/* ── Mobile pane (mobileA): Menu opens a full-height panel ── */
+function createMobile() {
+  const node = document.getElementById('mobileTpl').content.firstElementChild.cloneNode(true);
+  const p = basePane(node, MOBILE_W, MOBILE_H);
+  const { scroller, hdr, page } = p;
+  const local = { menu: false, scrolled: false };
+  const menu = node.querySelector('.m-menu');
+  const menuBtn = node.querySelector('[data-menu]');
+  const input = menu.querySelector('input');
+  const results = menu.querySelector('.m-search');
+
+  function render() {
+    const overlapActive = isOverlap();
+    const solid = !overlapActive || local.scrolled || local.menu;
+
+    p.paint();
+    page.classList.toggle('is-under', overlapActive);
+    hdr.classList.toggle('is-transparent', !solid);
+    hdr.classList.toggle('is-menu', local.menu);
+    menuBtn.textContent = local.menu ? 'Close' : 'Menu';
+    const typing = !!input.value.trim();
+    results.classList.toggle('is-empty', !typing);
+    menu.classList.toggle('is-typing', typing);
+
+    const reason = local.menu ? 'menu' : !overlapActive ? '겹치지 않음' : 'scrolled';
+    p.statusHTML(solid, reason);
+  }
+
+  function setMenu(open) {
+    local.menu = open;
+    if (!open) { menu.dataset.depth = '1'; input.value = ''; }
+    render();
+  }
+  menuBtn.addEventListener('click', () => { setMenu(!local.menu); viewReleased(); });
+  menu.querySelector('[data-to2]').addEventListener('click', () => { menu.dataset.depth = '2'; });
+  menu.querySelector('[data-to1]').addEventListener('click', () => { menu.dataset.depth = '1'; });
+  input.addEventListener('input', render);
+  scroller.addEventListener('scroll', () => {
+    const s = scroller.scrollTop > 0;
+    if (s !== local.scrolled) { local.scrolled = s; render(); }
+  }, { passive: true });
+
+  return {
+    node, render,
+    setPage() { page.innerHTML = pageHTML(state.page); scroller.scrollTop = 0; local.scrolled = false; setMenu(false); },
+    setView(view, opts = {}) {
+      scroller.scrollTop = view === 'scroll' ? SCROLL_Y : 0;
+      local.menu = view === 'menu' || view === 'search'; // no hover on touch
+      menu.dataset.depth = opts.depth2 ? '2' : '1';
+      input.value = view === 'search' && !opts.emptySearch ? 'Product' : '';
+      render();
+    },
+  };
+}
+
+/* ── Stage: desktop 1920 × 1080 and mobile 390 × 844, scaled to one shared height that fits ── */
+const SCROLL_Y = 400;
+const stage = document.getElementById('stage');
+const stageInner = document.getElementById('stageInner');
+const previews = document.getElementById('previews');
+const panes = [createDesktop(), createMobile()];
+panes.forEach(p => previews.appendChild(p.node));
+new ResizeObserver(() => {
+  const cs = getComputedStyle(stage);
+  const availW = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const availH = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+    - stageInner.querySelector('.stage-tools').offsetHeight - (parseFloat(getComputedStyle(stageInner).rowGap) || 0);
+  const gap = parseFloat(getComputedStyle(previews).columnGap) || 0;
+  const ratios = [DESKTOP_W / DESKTOP_H, MOBILE_W / MOBILE_H];
+  const h = Math.max(120, Math.floor(Math.min(availH, (availW - gap) / (ratios[0] + ratios[1]))));
+  let total = gap;
+  panes.forEach((p, i) => {
+    const w = Math.floor(h * ratios[i]);
+    total += w;
+    p.node.style.width = w + 'px';
+    p.node.querySelector('.frame').style.height = h + 'px';
+  });
+  stageInner.style.width = total + 'px';
+}).observe(stage);
+
+function renderAll() { panes.forEach(p => p.render()); }
+function setPageAll() { panes.forEach(p => { p.setPage(); p.setView(state.view); }); }
+
+// preview state, driven by "컬러 수정 중인 화면 자동 보기"
+function setView(view, opts) {
+  state.view = view;
+  panes.forEach(p => p.setView(view, opts));
+}
+// user interaction inside a preview ends a forced state (scroll stays as the user left it)
+function viewReleased() {
+  if (state.view === 'default' || state.view === 'scroll') return;
+  state.view = 'default';
+}
+
+/* ── Editor controls ── */
+
+document.getElementById('customFields').innerHTML = ROLES.map((r, i) => r.group
+  ? `${i ? '<hr class="cdivider">' : ''}<p class="cgroup">${r.group}</p>`
+  : `<div class="cfield" data-key="${r.key}">
+    <button type="button" class="swatch checker" id="sw-${r.key}" aria-haspopup="dialog" aria-expanded="false" aria-label="${r.label} 색상 선택"><i></i></button>
+    <label for="sw-${r.key}">${r.label}${r.key === 'bg' ? '<span class="tag" id="blurTag" hidden></span>' : ''}</label>
+  </div>`).join('');
+document.getElementById('onTonesB').innerHTML = ['dark', 'light'].map((tone, i) =>
+  `${i ? '<hr class="cdivider">' : ''}<p class="cgroup">${TONE_LABEL[tone]}</p>` +
+  [['bg', '배경'], ['fg', '전경']].map(([key, label]) => `<div class="cfield">
+    <button type="button" class="swatch checker" id="swB-${tone}-${key}" data-tone="${tone}" data-on-key="${key}" aria-haspopup="dialog" aria-expanded="false"><i></i></button>
+    <label for="swB-${tone}-${key}">${label}</label>
+  </div>`).join('')).join('');
+document.getElementById('onTones').innerHTML =
+  `<div class="tones-head"><span></span><span>배경</span><span>전경</span><span data-only="stage">로고 컬러</span></div>` +
+  ['dark', 'light'].map(tone => `
+  <span class="tone-name">${TONE_LABEL[tone]}</span>
+  <button type="button" class="swatch checker" data-tone="${tone}" data-on-key="bg" aria-haspopup="dialog" aria-expanded="false" aria-label="${TONE_LABEL[tone]} 배경 색상 선택"><i></i></button>
+  <button type="button" class="swatch checker" data-tone="${tone}" data-on-key="fg" aria-haspopup="dialog" aria-expanded="false" aria-label="${TONE_LABEL[tone]} 전경 색상 선택" title="메뉴 · 유틸리티 텍스트"><i></i></button>
+  <div class="seg logo-seg" data-tone="${tone}" data-only="stage" role="group" aria-label="${TONE_LABEL[tone]} 로고">
+    <button type="button" data-logo="light">밝은</button>
+    <button type="button" data-logo="dark">어두운</button>
+  </div>`).join('');
+
+// announce the toggle the first time Custom is chosen
+const coach = document.getElementById('autoShowTip');
+let coachSeen = false;
+try { coachSeen = localStorage.getItem('hdr-editor-autoshow-tip') === '1'; } catch (e) {}
+function dismissCoach() {
+  if (coach.hidden) return;
+  coach.hidden = true; coachSeen = true;
+  try { localStorage.setItem('hdr-editor-autoshow-tip', '1'); } catch (e) {}
+}
+function maybeShowCoach() {
+  if (coachSeen || !isCustomizing()) return;
+  coach.hidden = false;
+}
+coach.querySelector('.coach-close').addEventListener('click', dismissCoach);
+document.getElementById('autoShow').addEventListener('change', dismissCoach);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') dismissCoach(); });
+
+function autoShow(key) {
+  if (!document.getElementById('autoShow').checked) return;
+  if (key === 'dark' || key === 'light') showTone(key);
+  else if (isSearchKey(key)) setView('search', { emptySearch: needsEmptySearch(key), resultHover: key === 'sResultHover' });
+  else setView('menu', { hoverMark: key === 'hover', depth2: key === 'secondary' });
+}
+/* ── colour picker (HSV + alpha), opened from a swatch ── */
+const cp = {
+  el: document.getElementById('cpick'), key: null, obj: null, h: 0, s: 0, v: 0, a: 1, // obj: state.custom or one of state.onColors
+  sv: document.getElementById('cpSV'), hue: document.getElementById('cpHue'), alpha: document.getElementById('cpAlpha'),
+  hex: document.getElementById('cpHex'), pct: document.getElementById('cpPct'),
+};
+const clamp = (n, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
+function hexToRgba(hex) {
+  let h = hex.slice(1);
+  if (h.length === 3) h = [...h].map(c => c + c).join('');
+  const n = i => parseInt(h.slice(i, i + 2), 16);
+  return { r: n(0), g: n(2), b: n(4), a: h.length === 8 ? n(6) / 255 : 1 };
+}
+function rgbToHsv({ r, g, b }) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+  let h = 0;
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: (h * 60 + 360) % 360, s: max ? d / max : 0, v: max };
+}
+function hsvToRgb(h, s, v) {
+  const f = n => { const k = (n + h / 60) % 6; return Math.round((v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255); };
+  return { r: f(5), g: f(3), b: f(1) };
+}
+const hx = n => n.toString(16).padStart(2, '0');
+const cpRgbHex = () => { const { r, g, b } = hsvToRgb(cp.h, cp.s, cp.v); return '#' + hx(r) + hx(g) + hx(b); };
+const cpValue = () => cpRgbHex() + (cp.a < 1 ? hx(Math.round(cp.a * 255)) : '');
+
+function cpPaint(skip) {
+  const solid = cpRgbHex();
+  cp.el.style.setProperty('--h', cp.h);
+  cp.el.style.setProperty('--solid', solid);
+  const svh = document.getElementById('cpSVh');
+  svh.style.left = cp.s * 100 + '%'; svh.style.top = (1 - cp.v) * 100 + '%'; svh.style.setProperty('--c', solid);
+  const hh = document.getElementById('cpHueh');
+  hh.style.left = cp.h / 360 * 100 + '%'; hh.style.setProperty('--c', `hsl(${cp.h} 100% 50%)`);
+  const ah = document.getElementById('cpAlphah');
+  ah.style.left = cp.a * 100 + '%'; ah.style.setProperty('--c', solid);
+  if (skip !== cp.hex) { cp.hex.value = solid.slice(1).toUpperCase(); cp.hex.removeAttribute('aria-invalid'); }
+  if (skip !== cp.pct) cp.pct.value = Math.round(cp.a * 100);
+  const blur = document.getElementById('cpBlur');
+  blur.hidden = cp.key !== 'bg';
+  if (!blur.hidden) {
+    const on = !!cp.obj.blurOn, v = cp.obj.blur || 8;
+    document.getElementById('cpBlurOn').checked = on;
+    document.getElementById('cpBlurAmount').hidden = !on;
+    document.getElementById('cpBlurRange').value = v;
+    document.getElementById('cpBlurOut').textContent = v + 'px';
+  }
+}
+function cpCommit(skip) {
+  cp.obj[cp.key] = cpValue();
+  markEdited();
+  cpPaint(skip); syncCustom(); renderAll(); syncEditor();
+}
+function markOnEdited() {
+  if (state.onEdited) return;
+  state.onEdited = true;
+  syncEditor(); maybeShowCoach();
+}
+const markEdited = () => { if (cp.obj === state.custom) state.customEdited = true; };
+function openPicker(key, btn, obj = state.custom) {
+  if (cp.key === key && cp.obj === obj && !cp.el.hidden) return closePicker();
+  closePicker();
+  cp.key = key; cp.obj = obj;
+  const rgba = hexToRgba(obj[key]);
+  Object.assign(cp, rgbToHsv(rgba), { a: rgba.a });
+  btn.setAttribute('aria-expanded', 'true');
+  cp.el.hidden = false;
+  cpPaint();
+  // open just right of the editor panel, level with the swatch, so the other rows stay visible
+  const r = btn.getBoundingClientRect(), h = cp.el.offsetHeight;
+  cp.el.style.left = (document.querySelector('.editor').getBoundingClientRect().right + 8) + 'px';
+  cp.el.style.top = clamp(r.top - 12, 8, innerHeight - h - 8) + 'px';
+  if (obj !== state.custom) markOnEdited();
+  autoShow(obj === state.custom ? key : (obj === state.onColors.dark ? 'dark' : 'light'));
+}
+function closePicker() {
+  if (cp.el.hidden) return;
+  cp.el.hidden = true;
+  document.querySelectorAll('.swatch[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+  cp.key = null; cp.obj = null;
+}
+function dragOn(el, onMove) {
+  el.addEventListener('pointerdown', e => {
+    el.setPointerCapture(e.pointerId);
+    const move = ev => { const r = el.getBoundingClientRect(); onMove(clamp((ev.clientX - r.left) / r.width), clamp((ev.clientY - r.top) / r.height)); };
+    move(e);
+    el.onpointermove = move;
+    el.onpointerup = () => { el.onpointermove = null; };
+  });
+}
+dragOn(cp.sv, (x, y) => { cp.s = x; cp.v = 1 - y; cpCommit(); });
+dragOn(cp.hue, x => { cp.h = x * 360; cpCommit(); });
+dragOn(cp.alpha, x => { cp.a = Math.round(x * 100) / 100; cpCommit(); });
+cp.hex.addEventListener('input', () => {
+  const v = cp.hex.value.trim().replace(/^#/, '');
+  const ok = /^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
+  cp.hex.setAttribute('aria-invalid', String(!ok));
+  if (!ok) return;
+  Object.assign(cp, rgbToHsv(hexToRgba('#' + v)));
+  cpCommit(cp.hex);
+});
+cp.pct.addEventListener('input', () => {
+  const n = parseInt(cp.pct.value, 10);
+  if (Number.isNaN(n)) return;
+  cp.a = clamp(n / 100);
+  cpCommit(cp.pct);
+});
+cp.pct.addEventListener('blur', () => cpPaint());
+cp.hex.addEventListener('blur', () => cpPaint());
+document.getElementById('cpBlurOn').addEventListener('change', e => {
+  cp.obj.blurOn = e.target.checked;
+  markEdited();
+  cpPaint(); syncCustom(); renderAll();
+});
+document.getElementById('cpBlurRange').addEventListener('input', e => {
+  cp.obj.blur = +e.target.value;
+  markEdited();
+  cpPaint(); syncCustom(); renderAll();
+});
+document.addEventListener('pointerdown', e => {
+  if (!cp.el.hidden && !cp.el.contains(e.target) && !e.target.closest('.swatch')) closePicker();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+document.querySelector('.editor').addEventListener('scroll', closePicker);
+
+document.querySelectorAll('.cfield[data-key]').forEach(row => {
+  const key = row.dataset.key;
+  row.querySelector('.swatch').addEventListener('click', e => openPicker(key, e.currentTarget));
+});
+document.querySelectorAll('[data-on-key]').forEach(btn => {
+  btn.addEventListener('click', () => openPicker(btn.dataset.onKey, btn, state.onColors[btn.dataset.tone]));
+});
+document.querySelectorAll('.logo-seg[data-tone]').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.onColors[seg.dataset.tone].logo = b.dataset.logo;
+  closePicker(); syncCustom(); renderAll(); markOnEdited();
+  autoShow(seg.dataset.tone);
+}));
+document.querySelectorAll('[data-load]').forEach(b => b.addEventListener('click', () => {
+  state.custom = { ...SCHEMES[b.dataset.load] };
+  syncCustom(); renderAll(); syncEditor();
+}));
+
+function syncCustom() {
+  document.querySelectorAll('.cfield[data-key]').forEach(row => {
+    row.querySelector('.swatch i').style.setProperty('--v', state.custom[row.dataset.key]);
+  });
+  const tag = document.getElementById('blurTag');
+  tag.hidden = !state.custom.blurOn;
+  tag.textContent = `블러 ${state.custom.blur}`;
+  document.querySelectorAll('[data-on-key]').forEach(btn =>
+    btn.querySelector('i').style.setProperty('--v', state.onColors[btn.dataset.tone][btn.dataset.onKey]));
+  for (const tone of ['dark', 'light']) {
+    const oc = state.onColors[tone];
+    document.querySelectorAll(`[data-tone="${tone}"][data-on-key="bg"]`).forEach(bg => {
+      bg.classList.toggle('has-blur', !!oc.blurOn);
+      bg.title = oc.blurOn ? `블러 ${oc.blur}px` : '';
+    });
+    document.querySelectorAll(`.logo-seg[data-tone="${tone}"] button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.logo === oc.logo)));
+    document.querySelectorAll(`[data-tone-chip="${tone}"]`).forEach(ch => ch.style.setProperty('--c', oc.fg));
+  }
+}
+
+function syncEditor() {
+  const fullBleed = PAGES[state.page].fullBleed;
+  const inset = SET_INFO[state.set].inset;
+  syncDisplay();
+  syncOverlapA();
+  syncOverlapC();
+
+  const c = colors();
+  document.getElementById('scheme').value = state.scheme;
+  document.querySelectorAll('#solidLogo button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.logo === state.solidLogo)));
+  document.getElementById('schemeChip').style.cssText = `--b:${c.bg};--c:${c.nav}`;
+  document.getElementById('customPanel').classList.toggle('is-hidden', state.scheme !== 'custom');
+  document.getElementById('autoShowWrap').classList.toggle('is-hidden', !isCustomizing());
+  // 미디어 위 컬러 is always shown, overlap or not (it's not dimmed with 겹쳤을 때 컬러)
+  // A안: right under 겹쳤을 때 컬러 · B안·C안: in its own section
+  const tones = document.getElementById('onTones');
+  const host = state.mode === 'color' ? document.getElementById('overlapGroup') : document.getElementById('onCustomGroup');
+  // order: description, B안 vertical list, tone grid, 로고 last
+  for (const id of ['onIntro', 'onTonesB', 'onTones', 'pageLogoRow']) host.appendChild(document.getElementById(id));
+  document.getElementById('onCustomGroup').classList.toggle('is-hidden', state.mode === 'color');
+  document.querySelectorAll('#pageLogo button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === pageCfg().logo)));
+  document.getElementById('solidHint').textContent = inset
+    ? '헤더의 기본 컬러예요. 데스크톱은 헤더와 2depth 메뉴에 항상, 모바일은 겹치지 않을 때·스크롤·메뉴를 열었을 때 적용돼요.'
+    : '헤더의 기본 컬러예요. 미디어 위에 겹치지 않을 때와 호버·스크롤 시, 2depth·검색·모바일 메뉴에 적용돼요.';
+}
+
+const thumbInner = n => `<i></i><i></i>${n === '04' ? '' : '<b></b>'}<i class="r"></i>`;
+const thumbHTML = n => n === '08'
+  ? `<div class="set-thumb inset"><div>${thumbInner(n)}</div></div>`
+  : `<div class="set-thumb">${thumbInner(n)}</div>`;
+
+const dialog = document.getElementById('designDialog');
+const setsEl = document.getElementById('sets');
+let pendingSet = state.set;
+setsEl.innerHTML = SETS.map(n => `
+  <button type="button" class="set" data-set="${n}" aria-pressed="false" ${ENABLED_SETS.includes(n) ? '' : 'disabled'}>
+    ${thumbHTML(n)}
+    <span>set ${setLabel(n)}</span>
+    <small>${SET_INFO[n].desc}</small>
+  </button>`).join('');
+const syncPending = () => {
+  setsEl.querySelectorAll('.set').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.set === pendingSet)));
+  document.getElementById('applyDesign').disabled = pendingSet === state.set;
+};
+setsEl.addEventListener('click', e => {
+  const b = e.target.closest('.set');
+  if (!b || b.disabled) return;
+  pendingSet = b.dataset.set; syncPending();
+});
+setsEl.addEventListener('dblclick', e => {
+  const b = e.target.closest('.set');
+  if (b && !b.disabled) dialog.close('apply');
+});
+document.getElementById('openDesigns').addEventListener('click', () => {
+  pendingSet = state.set; syncPending(); dialog.showModal();
+});
+dialog.addEventListener('close', () => {
+  if (dialog.returnValue !== 'apply' || pendingSet === state.set) return;
+  state.set = pendingSet;
+  syncEditor();
+  renderAll();
+});
+// backdrop click closes without applying
+dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close('cancel'); });
+
+document.getElementById('scheme').addEventListener('change', e => {
+  // Custom starts from the scheme you were on, until you edit it
+  if (e.target.value === 'custom' && state.scheme !== 'custom' && !state.customEdited) state.custom = { ...SCHEMES[state.scheme] };
+  state.scheme = e.target.value;
+  closePicker();
+  syncCustom(); renderAll(); syncEditor();
+  maybeShowCoach();
+});
+
+// 로고 컬러 (A안·B안, per page): 자동 follows the tone — 밝은 로고 on dark, 어두운 로고 on light
+document.getElementById('pageLogo').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  pageCfg().logo = b.dataset.v;
+  closePicker(); syncEditor(); renderAll(); markOnEdited();
+  if (document.getElementById('autoShow').checked && isOverlap()) setView('default');
+});
+document.getElementById('solidLogo').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.solidLogo = b.dataset.logo;
+  closePicker(); syncEditor(); renderAll();
+  if (document.getElementById('autoShow').checked && isOverlap()) setView('scroll'); // solid header shows once scrolled
+});
+
+/* ── A안: overlap settings inside the 컬러 menu (per page, dimmed when impossible) ── */
+function syncOverlapA() {
+  const fullBleed = canOverlap();
+  const cfg = pageCfg();
+  const toggle = document.getElementById('overlapA');
+  toggle.checked = fullBleed && cfg.overlap;
+  toggle.disabled = !fullBleed;
+  toggle.closest('.group-title').classList.toggle('is-dimmed-ui', !fullBleed);
+  document.getElementById('insetHintA').classList.toggle('is-hidden', !SET_INFO[state.set].inset);
+  const pageName = document.querySelector(`#page option[value="${state.page}"]`).textContent;
+  document.getElementById('overlapHint').textContent = fullBleed
+    ? `페이지별로 설정됩니다 · 현재: ${pageName}`
+    : `이 페이지(${pageName})는 최상단에 풀블리드 섹션이 없어 겹칠 수 없어요.`;
+  const onEnabled = fullBleed && cfg.overlap;
+  document.getElementById('onGroup').classList.toggle('is-dimmed-ui', !onEnabled);
+  document.querySelectorAll('#onSeg button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.v === cfg.on));
+    b.disabled = !onEnabled;
+  });
+}
+document.getElementById('overlapA').addEventListener('change', e => { pageCfg().overlap = e.target.checked; syncEditor(); renderAll(); });
+document.getElementById('onSeg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  setOn(b.dataset.v);
+});
+
+// 겹쳤을 때 컬러 (all versions)
+function setOn(v) {
+  pageCfg().on = v;
+  syncEditor(); renderAll();
+}
+// 자동 보기 for an on-media tone: if this page doesn't show that tone, jump to a page that does
+function showTone(tone) {
+  const effective = k => { const c = state.pages[k]; return c.on === 'auto' ? (PAGES[k].hero ? PAGES[k].hero.tone : 'dark') : c.on; };
+  const showsTone = k => PAGES[k].fullBleed && state.pages[k].overlap && effective(k) === tone;
+  const target = showsTone(state.page) ? null : Object.keys(PAGES).find(showsTone);
+  if (target) {
+    state.page = target;
+    document.getElementById('page').value = target;
+    syncEditor(); setPageAll();
+  }
+  setView('default'); // on-media colours show on the untouched first screen
+}
+
+/* ── C안: same per-page overlap settings, placed at the preview's top right ── */
+function syncOverlapC() {
+  const fullBleed = canOverlap();
+  const cfg = pageCfg();
+  const wrap = document.getElementById('overlapC');
+  const toggle = document.getElementById('overlapCToggle');
+  toggle.checked = fullBleed && cfg.overlap;
+  toggle.disabled = !fullBleed;
+  wrap.classList.toggle('is-dimmed-ui', !fullBleed);
+  wrap.title = fullBleed ? '' : '이 페이지는 최상단에 풀블리드 섹션이 없어 겹칠 수 없어요.';
+  const onEnabled = fullBleed && cfg.overlap;
+  const seg = document.getElementById('onSegC');
+  seg.classList.toggle('is-dimmed-ui', fullBleed && !onEnabled); // whole control is already dimmed when impossible
+  seg.querySelectorAll('button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.v === cfg.on));
+    b.disabled = !onEnabled;
+  });
+}
+document.getElementById('overlapCToggle').addEventListener('change', e => { pageCfg().overlap = e.target.checked; syncEditor(); renderAll(); });
+document.getElementById('onSegC').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  setOn(b.dataset.v);
+});
+
+/* ── version switch (prototype only) ── */
+document.querySelectorAll('.version-switch button').forEach(b => b.addEventListener('click', () => {
+  state.mode = b.dataset.mode;
+  document.body.dataset.mode = state.mode;
+  document.querySelectorAll('.version-switch button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  setPopover(false);
+  if (state.mode === 'display') setView('default'); // B안 has no preview-state dropdown
+  syncEditor(); renderAll();
+}));
+
+/* ── 헤더 표시: per-page overlap, only offered when the page starts with a full-bleed section ── */
+const PICKS = {
+  on:   [['auto', '자동'], ['dark', '어두운 미디어 위'], ['light', '밝은 미디어 위']],
+};
+const displayWrap = document.getElementById('displayWrap');
+const displayBtn = document.getElementById('displayBtn');
+const displayPop = document.getElementById('displayPop');
+const pickMenu = document.getElementById('pickMenu');
+let openPick = null;
+
+function syncDisplay() {
+  const cfg = pageCfg();
+  // pages without a full-bleed top section can't overlap: keep the button, dimmed, so the state stays visible
+  displayBtn.disabled = !canOverlap();
+  displayBtn.title = canOverlap() ? '' : '이 페이지는 최상단에 풀블리드 섹션이 없어 겹칠 수 없어요.';
+  if (!canOverlap()) setPopover(false);
+  const badge = document.getElementById('displayBadge');
+  badge.classList.toggle('is-on', isOverlap());
+  badge.querySelector('b').textContent = !canOverlap() ? '겹칠 수 없음' : isOverlap() ? '겹침' : '기본';
+  document.getElementById('overlap').checked = cfg.overlap;
+  document.getElementById('ovColors').classList.toggle('is-hidden', !cfg.overlap);
+  document.getElementById('insetHint').classList.toggle('is-hidden', !SET_INFO[state.set].inset);
+  document.querySelectorAll('.pick').forEach(b => {
+    b.querySelector('b').textContent = PICKS[b.dataset.pick].find(([v]) => v === cfg[b.dataset.pick])[1];
+  });
+}
+function setPopover(open) {
+  displayPop.hidden = !open;
+  displayBtn.setAttribute('aria-expanded', String(open));
+  if (!open) closePick();
+}
+function closePick() { pickMenu.hidden = true; openPick = null; }
+displayBtn.addEventListener('click', () => setPopover(displayPop.hidden));
+document.getElementById('overlap').addEventListener('change', e => {
+  pageCfg().overlap = e.target.checked; closePick(); syncDisplay(); renderAll();
+});
+document.querySelectorAll('.pick').forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation();
+  if (openPick === b.dataset.pick) return closePick();
+  openPick = b.dataset.pick;
+  const cur = pageCfg()[openPick];
+  pickMenu.innerHTML = PICKS[openPick].map(([v, label]) =>
+    `<li role="option" data-v="${v}" aria-selected="${v === cur}">${label}<svg class="check" viewBox="0 0 18 18" aria-hidden="true"><path fill="currentColor" d="M6.75 12.1275L4.1475 9.525C3.855 9.2325 3.3825 9.2325 3.09 9.525C2.7975 9.8175 2.7975 10.29 3.09 10.5825L6.225 13.7175C6.5175 14.01 6.99 14.01 7.2825 13.7175L15.2175 5.7825C15.51 5.49 15.51 5.0175 15.2175 4.725C14.925 4.4325 14.4525 4.4325 14.16 4.725L6.75 12.1275Z"/></svg></li>`).join('');
+  // drop the list just under the trigger, right-aligned to it
+  const pr = displayPop.getBoundingClientRect(), br = b.getBoundingClientRect();
+  pickMenu.style.top = (br.bottom - pr.top + 4) + 'px';
+  pickMenu.style.left = (br.right - pr.left - 284) + 'px';
+  pickMenu.hidden = false;
+}));
+pickMenu.addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  if (openPick === 'on') { closePick(); setOn(li.dataset.v); return; }
+  pageCfg()[openPick] = li.dataset.v;
+  closePick(); syncDisplay(); renderAll();
+});
+document.addEventListener('pointerdown', e => {
+  if (displayPop.hidden) return;
+  if (!displayWrap.contains(e.target)) setPopover(false);
+  else if (!pickMenu.hidden && !pickMenu.contains(e.target) && !e.target.closest('.pick')) closePick();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || displayPop.hidden) return;
+  if (!pickMenu.hidden) closePick(); else { setPopover(false); displayBtn.focus(); }
+});
+document.getElementById('page').addEventListener('change', e => {
+  state.page = e.target.value;
+  syncEditor();
+  setPageAll();
+});
+
+/* ── Editor depths: menu list → 컬러 (others are placeholders) ── */
+function openDepth(id, title) {
+  document.querySelectorAll('.editor .depth').forEach(d => d.classList.toggle('is-hidden', d.id !== id));
+  document.body.dataset.depth = id;
+  if (title) document.getElementById('otherTitle').textContent = title;
+  document.querySelector('.editor').scrollTop = 0;
+}
+document.querySelectorAll('.menu-item').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.depth === 'color') openDepth('depthColor');
+  else openDepth('depthOther', b.querySelector('span').textContent);
+}));
+document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => {
+  dismissCoach(); closePicker();
+  openDepth('depthRoot');
+}));
+
+syncCustom();
+syncEditor();
+setPageAll();
+</script>
+</body>
+</html>
